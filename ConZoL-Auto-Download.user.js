@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GULF ConZoL - Auto Download + Rename + Sort
 // @namespace    gmtp.conzol
-// @version      4.6
+// @version      4.7
 // @description  Download PDFs and native attachments from GULF ConZoL EDMS automatically - names each file and sorts it into the folder ConZoL assigns.
 // @match        https://edms.gulf.co.th/dms/drawing.asp*
 // @match        http://edms.gulf.co.th/dms/drawing.asp*
@@ -20,7 +20,7 @@
   // If a panel already exists the later copy stops here - otherwise ids collide and buttons stop responding
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '4.6';   // kept in sync with @version at build time
+  const VERSION = '4.7';   // kept in sync with @version at build time
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.user.js';   // filled in per language at build time
 
   // ---------------- Settings ----------------
@@ -377,6 +377,7 @@
       #edmsdl button.go{background:#3d7a3d;color:#fff;border-color:#2c5c2c}
       #edmsdl button.go2{background:#2f5d8a;color:#fff;border-color:#254a6e}
       #edmsdl button.pick{background:#8a5a2f;color:#fff;border-color:#6e4522}
+      #edmsdl button.chk{background:#e8e2d5;color:#5a4a33;border-color:#b3a58c}
       #edmsdl button.stop{background:#a33;color:#fff;border-color:#822}
       #edmsdl select,#edmsdl input[type=file],#edmsdl textarea{font:11px Tahoma;max-width:100%}
       #edmsdl .log{max-height:200px;overflow:auto;margin-top:6px;border-top:1px solid #ddd;
@@ -399,6 +400,7 @@
 
       <fieldset><legend>1) From the current search results</legend>
         <label><input type="checkbox" id="edl-checked"> Only ticked rows</label>
+        <button class="chk" id="edl-check">Check first (no download)</button>
         <button class="go" id="edl-run">Download this page</button>
       </fieldset>
 
@@ -408,6 +410,7 @@
         <div id="edl-mdrinfo" class="sk" style="margin-top:3px">No list loaded</div>
         <div style="margin-top:4px">Exclude these documents:</div>
         <textarea id="edl-exclude" rows="2" style="width:100%;font:10px Consolas,monospace" placeholder="e.g. GMTP-MA-RPT-012"></textarea>
+        <button class="chk" id="edl-checkmdr">Check first (no download)</button>
         <button class="go2" id="edl-runmdr">Search ConZoL + download all</button>
       </fieldset>
 
@@ -690,7 +693,7 @@
   };
 
   // ============ Download runner ============
-  async function runDownload(items) {
+  async function runDownload(items, dry) {
     let ok = 0, skipped = 0, fail = 0, sup = 0, i = 0;
     const skip = el('edl-skip').checked;
     const doSup = el('edl-sup').checked;
@@ -732,6 +735,23 @@
           skipped++;
           lastReport.push({ ...r, result: 'Skipped (already present)', file: name, folder: '' });
           log(`[${i}/${items.length}] skipped ${name}`, 'sk');
+          continue;
+        }
+
+        if (dry) {
+          ok++;
+          const willSup = [];
+          if (doSup) for (const h of have) {
+            if ((h.ext || 'pdf') === k.ext && h.rank < rank && h.name !== name) willSup.push(h);
+          }
+          sup += willSup.length;
+          lastReport.push({ ...r, result: 'Will download', file: name, folder: parts.join('\\') });
+          log(`[${i}/${items.length}] + ${name}  →  ${parts.join('\\')}`, 'ok');
+          for (const h of willSup) {
+            lastReport.push({ ...r, rev: h.rev, result: 'Will move to _Superseded', file: h.name,
+                              folder: (h.path || parts).concat(CFG.supersededDir).join('\\') });
+            log(`      ↳ ${h.name} → _Superseded`, 'wn');
+          }
           continue;
         }
 
@@ -787,9 +807,10 @@
   }
 
   // ============ Mode 1 ============
-  el('edl-run').onclick = async () => {
+  async function runPage(dry) {
     if (running) return;
     running = true; stopFlag = false; logEl.innerHTML = ''; lastReport = [];
+    if (dry) log('Check mode - nothing is downloaded, written or moved', 'wn');
     await preflight();
     let rows = parseRows(document);
     if (el('edl-checked').checked) rows = rows.filter((r) => r.cb && r.cb.checked);
@@ -798,17 +819,23 @@
       log('Run a SEARCH first so the list has results', 'er'); running = false; return;
     }
     log(`Found ${rows.length} document(s) on this page`);
-    const s = await runDownload(rows.map((r) => ({ ...r, sheet: '' })));
-    statusEl.textContent = `Done: downloaded ${s.ok} · skipped ${s.skipped} · failed ${s.fail}` + (s.sup ? ` · superseded ${s.sup}` : '');
-    showDirInfo(); log('— Finished —');
+    const s = await runDownload(rows.map((r) => ({ ...r, sheet: '' })), dry);
+    statusEl.textContent = dry
+      ? `Check: would download ${s.ok} · skip ${s.skipped}` + (s.sup ? ` · superseded ${s.sup}` : '')
+      : `Done: downloaded ${s.ok} · skipped ${s.skipped} · failed ${s.fail}` + (s.sup ? ` · superseded ${s.sup}` : '');
+    showDirInfo();
+    log(dry ? '— Check finished (nothing downloaded) — press "Save CSV report" to keep the list' : '— Finished —');
     running = false;
-  };
+  }
+  el('edl-run').onclick = () => runPage(false);
+  el('edl-check').onclick = () => runPage(true);
 
   // ============ Mode 2 ============
-  el('edl-runmdr').onclick = async () => {
+  async function runMdr(dry) {
     if (running) return;
     if (!mdrList.length) { log('· Choose an MDR file first', 'er'); return; }
     running = true; stopFlag = false; logEl.innerHTML = ''; lastReport = [];
+    if (dry) log('Check mode - ConZoL is searched, but no file is downloaded', 'wn');
     await preflight();
 
     const dstatus = el('edl-inactive').checked ? '' : 'A';
@@ -865,10 +892,16 @@
     }
 
     if (items.length) {
-      const s = await runDownload(items);
-      statusEl.textContent = `Done: downloaded ${s.ok} · skipped ${s.skipped} · failed ${s.fail} · not found ${notFound.length}` + (s.sup ? ` · superseded ${s.sup}` : '');
+      const s = await runDownload(items, dry);
+      statusEl.textContent = dry
+        ? `Check: would download ${s.ok} · skip ${s.skipped} · not found ${notFound.length}` + (s.sup ? ` · superseded ${s.sup}` : '')
+        : `Done: downloaded ${s.ok} · skipped ${s.skipped} · failed ${s.fail} · not found ${notFound.length}` + (s.sup ? ` · superseded ${s.sup}` : '');
     } else statusEl.textContent = `Nothing to download (${notFound.length} not found)`;
-    showDirInfo(); log('— Finished — press "Save CSV report" to keep the results');
+    showDirInfo();
+    log(dry ? '— Check finished (nothing downloaded) — press "Save CSV report" to keep the list'
+            : '— Finished — press "Save CSV report" to keep the results');
     running = false;
-  };
+  }
+  el('edl-runmdr').onclick = () => runMdr(false);
+  el('edl-checkmdr').onclick = () => runMdr(true);
 })();

@@ -60,6 +60,11 @@ No auto-update on this route.
    - run a SEARCH and press **Download this page**, or
    - pick your MDR `.xlsx` and press **Search ConZoL + download all**
 
+**Check first (no download)** does a full dry run: it works out exactly what would be downloaded,
+what would be skipped and which revisions would move to `_Superseded`, and lists it in the log —
+without writing a single file. **Save CSV report** works after a check too, so you can review the
+plan in Excel before committing to it.
+
 **Re-sort folders** tidies files already on disk.
 
 ---
@@ -177,6 +182,10 @@ chrome://extensions/?id=dhdgffkkebhmkfjojejmpbldmpobfkfo
 4. เลือกวิธีโหลด
    - กด SEARCH ตามปกติ แล้วกด **โหลดจากหน้านี้** หรือ
    - เลือกไฟล์ MDR `.xlsx` แล้วกด **ค้น ConZoL + โหลดทั้งหมด**
+
+ปุ่ม **เช็คก่อน (ไม่โหลดจริง)** จะไล่ดูให้ครบว่าจะโหลดอะไรบ้าง ข้ามอะไร และตัวไหนจะถูกย้ายเข้า
+`_Superseded` แล้วแสดงในบันทึกการทำงาน โดยไม่เขียนไฟล์จริงสักไฟล์ กด **บันทึกรายงาน CSV**
+หลังเช็คได้เลย จะได้เอาไปดูใน Excel ก่อนตัดสินใจโหลดจริง
 
 ปุ่ม **จัดโฟลเดอร์ใหม่** ใช้จัดไฟล์เก่าที่กองอยู่ให้เข้าที่
 

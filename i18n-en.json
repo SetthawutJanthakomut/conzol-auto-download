@@ -514,5 +514,37 @@
  [
   "  //   MA-DWG MARINE Drawing\\1400 Berth 1\\_Superseded\\",
   "  //   MA-DWG MARINE Drawing\\1400 Berth 1\\_Superseded\\"
+ ],
+ [
+  ">เช็คก่อน (ไม่โหลดจริง)</button>",
+  ">Check first (no download)</button>"
+ ],
+ [
+  "'โหมดเช็คก่อน — ไม่มีการเขียนหรือย้ายไฟล์จริง'",
+  "'Check mode - nothing is downloaded, written or moved'"
+ ],
+ [
+  "'โหมดเช็คก่อน — ค้น ConZoL อย่างเดียว ไม่โหลดไฟล์จริง'",
+  "'Check mode - ConZoL is searched, but no file is downloaded'"
+ ],
+ [
+  "`ผลการเช็ค: จะโหลด ${s.ok} · ข้าม ${s.skipped} · ไม่พบ ${notFound.length}`",
+  "`Check: would download ${s.ok} · skip ${s.skipped} · not found ${notFound.length}`"
+ ],
+ [
+  "`ผลการเช็ค: จะโหลด ${s.ok} · ข้าม ${s.skipped}`",
+  "`Check: would download ${s.ok} · skip ${s.skipped}`"
+ ],
+ [
+  "result: 'จะโหลด'",
+  "result: 'Will download'"
+ ],
+ [
+  "result: 'จะย้ายเข้า _Superseded'",
+  "result: 'Will move to _Superseded'"
+ ],
+ [
+  "'— จบการเช็ค (ยังไม่ได้โหลด) — กด \"บันทึกรายงาน CSV\" เพื่อเก็บผล'",
+  "'— Check finished (nothing downloaded) — press \"Save CSV report\" to keep the list'"
  ]
 ]

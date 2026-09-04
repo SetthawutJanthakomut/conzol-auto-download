@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GULF ConZoL – Auto Download + Rename + Sort (MDR)
 // @namespace    gmtp.marine.jay
-// @version      4.6
+// @version      4.7
 // @description  ดาวน์โหลด PDF และไฟล์แนบ (FILE+) จาก ConZoL ลงโฟลเดอร์ที่เลือกไว้โดยตรง (ไม่ผ่าน Download ของ Chrome) ตั้งชื่อ <DocNo>-<Rev>_<Title>.pdf แยกโฟลเดอร์ตามหมวด ย้าย Rev เก่าเข้า _Superseded และอ่านรายการจากไฟล์ MDR ให้เอง
 // @author       JAY
 // @match        https://edms.gulf.co.th/dms/drawing.asp*
@@ -20,7 +20,7 @@
   // ถ้ามีกล่องอยู่แล้ว ให้ชุดที่มาทีหลังหยุดทำงาน ไม่งั้น id จะซ้ำและปุ่มจะกดไม่ติด
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '4.6';   // ซิงก์อัตโนมัติจาก @version ตอน build
+  const VERSION = '4.7';   // ซิงก์อัตโนมัติจาก @version ตอน build
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.th.user.js';   // build.py ใส่ให้ตามภาษา
 
   // ---------------- ตั้งค่าได้ตรงนี้ ----------------
@@ -360,6 +360,7 @@
       #edmsdl button.go{background:#3d7a3d;color:#fff;border-color:#2c5c2c}
       #edmsdl button.go2{background:#2f5d8a;color:#fff;border-color:#254a6e}
       #edmsdl button.pick{background:#8a5a2f;color:#fff;border-color:#6e4522}
+      #edmsdl button.chk{background:#e8e2d5;color:#5a4a33;border-color:#b3a58c}
       #edmsdl button.stop{background:#a33;color:#fff;border-color:#822}
       #edmsdl select,#edmsdl input[type=file],#edmsdl textarea{font:11px Tahoma;max-width:100%}
       #edmsdl .log{max-height:200px;overflow:auto;margin-top:6px;border-top:1px solid #ddd;
@@ -382,6 +383,7 @@
 
       <fieldset><legend>1) จากหน้าผลค้นหาปัจจุบัน</legend>
         <label><input type="checkbox" id="edl-checked"> เฉพาะแถวที่ติ๊ก checkbox</label>
+        <button class="chk" id="edl-check">เช็คก่อน (ไม่โหลดจริง)</button>
         <button class="go" id="edl-run">โหลดจากหน้านี้</button>
       </fieldset>
 
@@ -391,6 +393,7 @@
         <div id="edl-mdrinfo" class="sk" style="margin-top:3px">ยังไม่ได้โหลดรายการ</div>
         <div style="margin-top:4px">ไม่เอาเอกสารเหล่านี้:</div>
         <textarea id="edl-exclude" rows="2" style="width:100%;font:10px Consolas,monospace" placeholder="เช่น GMTP-MA-RPT-012"></textarea>
+        <button class="chk" id="edl-checkmdr">เช็คก่อน (ไม่โหลดจริง)</button>
         <button class="go2" id="edl-runmdr">ค้น ConZoL + โหลดทั้งหมด</button>
       </fieldset>
 
@@ -673,7 +676,7 @@
   };
 
   // ============ ตัวรันดาวน์โหลด ============
-  async function runDownload(items) {
+  async function runDownload(items, dry) {
     let ok = 0, skipped = 0, fail = 0, sup = 0, i = 0;
     const skip = el('edl-skip').checked;
     const doSup = el('edl-sup').checked;
@@ -715,6 +718,23 @@
           skipped++;
           lastReport.push({ ...r, result: 'ข้าม (มีอยู่แล้ว)', file: name, folder: '' });
           log(`[${i}/${items.length}] ข้าม ${name}`, 'sk');
+          continue;
+        }
+
+        if (dry) {
+          ok++;
+          const willSup = [];
+          if (doSup) for (const h of have) {
+            if ((h.ext || 'pdf') === k.ext && h.rank < rank && h.name !== name) willSup.push(h);
+          }
+          sup += willSup.length;
+          lastReport.push({ ...r, result: 'จะโหลด', file: name, folder: parts.join('\\') });
+          log(`[${i}/${items.length}] + ${name}  →  ${parts.join('\\')}`, 'ok');
+          for (const h of willSup) {
+            lastReport.push({ ...r, rev: h.rev, result: 'จะย้ายเข้า _Superseded', file: h.name,
+                              folder: (h.path || parts).concat(CFG.supersededDir).join('\\') });
+            log(`      ↳ ${h.name} → _Superseded`, 'wn');
+          }
           continue;
         }
 
@@ -770,9 +790,10 @@
   }
 
   // ============ โหมด 1 ============
-  el('edl-run').onclick = async () => {
+  async function runPage(dry) {
     if (running) return;
     running = true; stopFlag = false; logEl.innerHTML = ''; lastReport = [];
+    if (dry) log('โหมดเช็คก่อน — ไม่มีการเขียนหรือย้ายไฟล์จริง', 'wn');
     await preflight();
     let rows = parseRows(document);
     if (el('edl-checked').checked) rows = rows.filter((r) => r.cb && r.cb.checked);
@@ -781,17 +802,23 @@
       log('กด SEARCH ให้มีผลลัพธ์ก่อน', 'er'); running = false; return;
     }
     log(`พบ ${rows.length} รายการในหน้านี้`);
-    const s = await runDownload(rows.map((r) => ({ ...r, sheet: '' })));
-    statusEl.textContent = `เสร็จ: สำเร็จ ${s.ok} · ข้าม ${s.skipped} · ผิดพลาด ${s.fail}` + (s.sup ? ` · เก่า→_Superseded ${s.sup}` : '');
-    showDirInfo(); log('— จบการทำงาน —');
+    const s = await runDownload(rows.map((r) => ({ ...r, sheet: '' })), dry);
+    statusEl.textContent = dry
+      ? `ผลการเช็ค: จะโหลด ${s.ok} · ข้าม ${s.skipped}` + (s.sup ? ` · เก่า→_Superseded ${s.sup}` : '')
+      : `เสร็จ: สำเร็จ ${s.ok} · ข้าม ${s.skipped} · ผิดพลาด ${s.fail}` + (s.sup ? ` · เก่า→_Superseded ${s.sup}` : '');
+    showDirInfo();
+    log(dry ? '— จบการเช็ค (ยังไม่ได้โหลด) — กด "บันทึกรายงาน CSV" เพื่อเก็บผล' : '— จบการทำงาน —');
     running = false;
-  };
+  }
+  el('edl-run').onclick = () => runPage(false);
+  el('edl-check').onclick = () => runPage(true);
 
   // ============ โหมด 2 ============
-  el('edl-runmdr').onclick = async () => {
+  async function runMdr(dry) {
     if (running) return;
     if (!mdrList.length) { log('· ยังไม่ได้เลือกไฟล์ MDR', 'er'); return; }
     running = true; stopFlag = false; logEl.innerHTML = ''; lastReport = [];
+    if (dry) log('โหมดเช็คก่อน — ค้น ConZoL อย่างเดียว ไม่โหลดไฟล์จริง', 'wn');
     await preflight();
 
     const dstatus = el('edl-inactive').checked ? '' : 'A';
@@ -848,10 +875,16 @@
     }
 
     if (items.length) {
-      const s = await runDownload(items);
-      statusEl.textContent = `เสร็จ: สำเร็จ ${s.ok} · ข้าม ${s.skipped} · ผิดพลาด ${s.fail} · ไม่พบ ${notFound.length}` + (s.sup ? ` · เก่า→_Superseded ${s.sup}` : '');
+      const s = await runDownload(items, dry);
+      statusEl.textContent = dry
+        ? `ผลการเช็ค: จะโหลด ${s.ok} · ข้าม ${s.skipped} · ไม่พบ ${notFound.length}` + (s.sup ? ` · เก่า→_Superseded ${s.sup}` : '')
+        : `เสร็จ: สำเร็จ ${s.ok} · ข้าม ${s.skipped} · ผิดพลาด ${s.fail} · ไม่พบ ${notFound.length}` + (s.sup ? ` · เก่า→_Superseded ${s.sup}` : '');
     } else statusEl.textContent = `ไม่มีรายการให้โหลด (ไม่พบ ${notFound.length})`;
-    showDirInfo(); log('— จบการทำงาน — กด "บันทึกรายงาน CSV" เพื่อเก็บผล');
+    showDirInfo();
+    log(dry ? '— จบการเช็ค (ยังไม่ได้โหลด) — กด "บันทึกรายงาน CSV" เพื่อเก็บผล'
+            : '— จบการทำงาน — กด "บันทึกรายงาน CSV" เพื่อเก็บผล');
     running = false;
-  };
+  }
+  el('edl-runmdr').onclick = () => runMdr(false);
+  el('edl-checkmdr').onclick = () => runMdr(true);
 })();
