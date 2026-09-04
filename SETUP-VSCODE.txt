@@ -1,0 +1,78 @@
+Publishing this folder to GitHub from VS Code
+=============================================
+
+The git repository is already created and the first commit
+is already made. You only need to push it.
+
+-----------------------------------------------------------
+1. Open the folder in VS Code
+-----------------------------------------------------------
+   File -> Open Folder...  ->  select  conzol-auto-download
+
+-----------------------------------------------------------
+2. Set your name on the commit  (once per machine)
+-----------------------------------------------------------
+   Terminal -> New Terminal, then:
+
+     git config --global user.name  "Your Name"
+     git config --global user.email "you@example.com"
+
+   Use the same email as your GitHub account.
+   Then re-stamp the existing commit:
+
+     git commit --amend --reset-author --no-edit
+
+-----------------------------------------------------------
+3. Publish
+-----------------------------------------------------------
+   Click the Source Control icon in the left bar
+   (the branching icon, or Ctrl+Shift+G)
+
+   Press  "Publish Branch"  or  "Publish to GitHub"
+
+   VS Code opens a browser to sign in to GitHub - allow it.
+   Choose  "Publish to GitHub public repository".
+
+   Public means anyone with the link can read it. It is not
+   advertised anywhere and is not listed in any store.
+   Auto-update needs the file to be readable, so public is
+   the simplest choice. Use private only if you will hand
+   colleagues the .zip instead.
+
+-----------------------------------------------------------
+4. Get the raw link and put it in the script
+-----------------------------------------------------------
+   On GitHub open  ConZoL-Auto-Download.user.js
+   and click the  Raw  button. The address looks like:
+
+     https://raw.githubusercontent.com/<you>/conzol-auto-download/main/ConZoL-Auto-Download.user.js
+
+   Edit the file and replace <YOUR-GITHUB-USERNAME> on the
+   @updateURL and @downloadURL lines with your real username.
+   Do the same in the Thai file if you will share it.
+
+   Commit and push:
+
+     git add -A
+     git commit -m "Set update URLs"
+     git push
+
+-----------------------------------------------------------
+5. What you send colleagues
+-----------------------------------------------------------
+   1. Install Tampermonkey
+      https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo
+
+   2. Click to install:
+      <the raw URL from step 4>
+
+   Tampermonkey shows an install page. They press Install.
+
+-----------------------------------------------------------
+6. Shipping a fix later
+-----------------------------------------------------------
+   - edit the .user.js
+   - raise the version line, e.g.  // @version 4.2
+   - Source Control -> commit -> push  (or: git push)
+
+   Tampermonkey picks it up on every machine by itself.

@@ -1,0 +1,97 @@
+Publishing ConZoL Auto Download - free auto-update setup
+===========================================================
+
+Goal: colleagues click one link, it installs, and every fix
+you make afterwards reaches them automatically - no fee,
+no store review, no re-sending files.
+
+Uses GitHub Gist (free) + Tampermonkey.
+
+
+-----------------------------------------------------------
+STEP 1 - Create the Gist   (once, ~2 minutes)
+-----------------------------------------------------------
+1. Sign in at   https://gist.github.com
+   (a free GitHub account is enough)
+
+2. Filename:    ConZoL-Auto-Download.user.js
+
+3. Paste the whole contents of the file
+   ConZoL-Auto-Download.user.js
+
+4. Choose  "Create public gist"
+   (public means anyone WITH THE LINK can read it;
+    it is not indexed as a product anywhere)
+
+5. On the gist page click the  Raw  button.
+   Copy the URL from the address bar. It looks like:
+
+   https://gist.githubusercontent.com/yourname/2f9c.../raw/ConZoL-Auto-Download.user.js
+
+   IMPORTANT: the URL must NOT contain a long commit hash
+   between /raw/ and the filename. If it does, delete that
+   part - only the plain /raw/<filename> form always serves
+   the newest version.
+
+
+-----------------------------------------------------------
+STEP 2 - Put that URL into the script
+-----------------------------------------------------------
+Open the gist, click Edit, and replace BOTH lines:
+
+   // @updateURL    PASTE_RAW_URL_HERE
+   // @downloadURL  PASTE_RAW_URL_HERE
+
+with the raw URL you copied. Save the gist.
+
+
+-----------------------------------------------------------
+STEP 3 - What you send colleagues
+-----------------------------------------------------------
+Two lines, that is all:
+
+   1. Install Tampermonkey:
+      https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo
+
+   2. Click this to install the tool:
+      <your raw gist URL>
+
+Tampermonkey opens an install page. They click Install. Done.
+
+
+-----------------------------------------------------------
+STEP 4 - Shipping an update later
+-----------------------------------------------------------
+1. Edit the gist
+2. Raise the version line, e.g.  // @version 4.2
+3. Save
+
+Tampermonkey checks for updates on its own and installs the
+new version for everyone. Nothing to send, nobody to chase.
+
+
+-----------------------------------------------------------
+If GitHub is blocked at the office
+-----------------------------------------------------------
+Any URL that serves the raw text file works instead:
+a company web server, a SharePoint direct link, or a shared
+network path. The file must be served as plain text and the
+URL must always return the latest version.
+
+If nothing is reachable, fall back to sending the zip and
+having colleagues use Load unpacked. It works the same, it
+just has no auto-update.
+
+
+-----------------------------------------------------------
+About the Chrome Web Store
+-----------------------------------------------------------
+The store has no free tier. A one-time USD 5 developer
+registration fee is required even for Unlisted items, which
+is why this Gist route is set up instead.
+
+If you do decide to pay later, the extension needs one
+change first: Chrome Web Store bans remotely hosted code,
+so xlsx.full.min.js has to be bundled inside the package
+instead of loaded from cdnjs. Icons at 16/32/48/128 px are
+already prepared.

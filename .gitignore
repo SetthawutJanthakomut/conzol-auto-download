@@ -1,0 +1,13 @@
+# OS / editor
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/
+*.code-workspace
+
+# never commit project documents
+*.pdf
+*.zip
+*.xlsx
+*.xlsm
+*.csv
