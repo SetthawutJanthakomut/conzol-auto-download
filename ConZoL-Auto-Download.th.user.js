@@ -7,8 +7,8 @@
 // @match        https://edms.gulf.co.th/dms/drawing.asp*
 // @match        http://edms.gulf.co.th/dms/drawing.asp*
 // @require      https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js
-// @updateURL    https://raw.githubusercontent.com/<YOUR-GITHUB-USERNAME>/conzol-auto-download/main/ConZoL-Auto-Download.th.user.js
-// @downloadURL  https://raw.githubusercontent.com/<YOUR-GITHUB-USERNAME>/conzol-auto-download/main/ConZoL-Auto-Download.th.user.js
+// @updateURL    https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.th.user.js
+// @downloadURL  https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.th.user.js
 // @run-at       document-idle
 // @grant        none
 // ==/UserScript==

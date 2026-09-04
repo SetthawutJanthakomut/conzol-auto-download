@@ -47,7 +47,7 @@ is already made. You only need to push it.
 
      https://raw.githubusercontent.com/<you>/conzol-auto-download/main/ConZoL-Auto-Download.user.js
 
-   Edit the file and replace <YOUR-GITHUB-USERNAME> on the
+   Edit the file and replace SetthawutJanthakomut on the
    @updateURL and @downloadURL lines with your real username.
    Do the same in the Thai file if you will share it.
 
