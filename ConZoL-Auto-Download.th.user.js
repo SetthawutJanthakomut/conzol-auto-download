@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GULF ConZoL – Auto Download + Rename + Sort (MDR)
 // @namespace    gmtp.marine.jay
-// @version      4.5
+// @version      4.6
 // @description  ดาวน์โหลด PDF และไฟล์แนบ (FILE+) จาก ConZoL ลงโฟลเดอร์ที่เลือกไว้โดยตรง (ไม่ผ่าน Download ของ Chrome) ตั้งชื่อ <DocNo>-<Rev>_<Title>.pdf แยกโฟลเดอร์ตามหมวด ย้าย Rev เก่าเข้า _Superseded และอ่านรายการจากไฟล์ MDR ให้เอง
 // @author       JAY
 // @match        https://edms.gulf.co.th/dms/drawing.asp*
@@ -20,7 +20,7 @@
   // ถ้ามีกล่องอยู่แล้ว ให้ชุดที่มาทีหลังหยุดทำงาน ไม่งั้น id จะซ้ำและปุ่มจะกดไม่ติด
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '4.5';   // ซิงก์อัตโนมัติจาก @version ตอน build
+  const VERSION = '4.6';   // ซิงก์อัตโนมัติจาก @version ตอน build
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.th.user.js';   // build.py ใส่ให้ตามภาษา
 
   // ---------------- ตั้งค่าได้ตรงนี้ ----------------
@@ -182,8 +182,10 @@
     await w.close();
   }
 
-  async function moveToSuperseded(item) {
-    const sup = await ensureDir([CFG.supersededDir]);
+  // Rev เก่าไปอยู่ _Superseded ที่ซ้อนอยู่ในโฟลเดอร์ของเอกสารนั้นเอง
+  //   MA-DWG MARINE Drawing\1400 Berth 1\_Superseded\
+  async function moveToSuperseded(item, destParts) {
+    const sup = await ensureDir((destParts || []).concat(CFG.supersededDir));
     try {
       if (item.handle.move) { await item.handle.move(sup, item.name); return true; }
     } catch (e) { /* ลองวิธีสำรอง */ }
@@ -548,7 +550,7 @@
       const sorted = [...group].sort((a, b) => b.rank - a.rank);
       for (let i = 0; i < sorted.length; i++) {
         const it = sorted[i];
-        const dest = (i === 0 || !doSup) ? parts : [CFG.supersededDir];
+        const dest = (i === 0 || !doSup) ? parts : parts.concat(CFG.supersededDir);
         try {
           const r = await moveTo(it, dest);
           if (r === 'moved') {
@@ -727,7 +729,7 @@
               if (doSup) {
                 for (const h of have.slice()) {
                   if ((h.ext || 'pdf') === k.ext && h.rank < rank && h.name !== name) {
-                    if (await moveToSuperseded(h)) {
+                    if (await moveToSuperseded(h, parts)) {
                       sup++; log(`      ↳ ${h.name} → _Superseded`, 'wn');
                       const ix = have.indexOf(h); if (ix >= 0) have.splice(ix, 1);
                     }

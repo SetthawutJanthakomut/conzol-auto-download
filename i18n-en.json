@@ -506,5 +506,13 @@
  [
   "   // build.py ใส่ให้ตามภาษา",
   "   // filled in per language at build time"
+ ],
+ [
+  "  // Rev เก่าไปอยู่ _Superseded ที่ซ้อนอยู่ในโฟลเดอร์ของเอกสารนั้นเอง",
+  "  // Superseded revisions go to a _Superseded folder inside the document's own folder"
+ ],
+ [
+  "  //   MA-DWG MARINE Drawing\\1400 Berth 1\\_Superseded\\",
+  "  //   MA-DWG MARINE Drawing\\1400 Berth 1\\_Superseded\\"
  ]
 ]

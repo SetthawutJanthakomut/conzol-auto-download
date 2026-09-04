@@ -71,7 +71,7 @@ No auto-update on this route.
 | **Naming** | `<DocNo>-<Rev>_<Title>.<ext>` — title comes from ConZoL |
 | **Folders** | Read from ConZoL's own group headers (`MA-CAL:MARINE Calculation`), never hard-coded — new disciplines and document types work with no changes |
 | **Areas** | `1400`, `0500`, `PCC`, `CAZ` … become sub-folders; add friendly labels in `AREA_LABELS` |
-| **Revisions** | Latest revision stays in place, older ones move to `_Superseded\` |
+| **Revisions** | Latest revision stays in place, older ones move to a `_Superseded\` folder inside the same document folder |
 | **Repeat runs** | Files already on disk are skipped — only new documents and changed revisions download |
 | **Cancelled docs** | Rows struck through or marked *Delete* in the MDR are ignored |
 | **Reporting** | **Save CSV report** lists what downloaded, what was skipped, what ConZoL does not have |
@@ -189,7 +189,7 @@ chrome://extensions/?id=dhdgffkkebhmkfjojejmpbldmpobfkfo
 | **ชื่อไฟล์** | `<เลขเอกสาร>-<Rev>_<ชื่อเรื่อง>.<นามสกุล>` — ชื่อเรื่องดึงจาก ConZoL |
 | **โฟลเดอร์** | อ่านจากหัวกลุ่มที่ ConZoL พิมพ์มาเอง (`MA-CAL:MARINE Calculation`) ไม่ได้ฮาร์ดโค้ด มีกลุ่มใหม่ก็รองรับทันที |
 | **พื้นที่** | `1400`, `0500`, `PCC`, `CAZ` แยกเป็นโฟลเดอร์ย่อย ใส่ชื่อกำกับเพิ่มได้ที่ `AREA_LABELS` |
-| **Rev** | เก็บ Rev ล่าสุดไว้ ตัวเก่าย้ายเข้า `_Superseded\` |
+| **Rev** | เก็บ Rev ล่าสุดไว้ ตัวเก่าย้ายเข้า `_Superseded\` ที่อยู่ในโฟลเดอร์เดียวกับเอกสารนั้น |
 | **รันซ้ำ** | ข้ามไฟล์ที่มีอยู่แล้ว โหลดเฉพาะเอกสารใหม่กับ Rev ที่เปลี่ยน |
 | **เอกสารยกเลิก** | แถวที่ขีดฆ่าหรือเขียน *Delete* ใน MDR จะถูกข้าม |
 | **รายงาน** | ปุ่ม **บันทึกรายงาน CSV** สรุปว่าโหลดอะไร ข้ามอะไร อะไรไม่มีใน ConZoL |
