@@ -7,22 +7,31 @@ ConZoL gives you `GMTP-1400-MA-DWG-401-T3.pdf`.
 This gives you `GMTP-1400-MA-DWG-401-T3_Berth # 1 Mooring Dolphin Deck Plan.pdf`, already in
 `MA-DWG MARINE Drawing\1400 Berth 1\`.
 
+Available in **English** and **ไทย** — same features, same version, built from one source.
+
 ---
 
-## Install (choose one)
+## Install
 
-### A. Tampermonkey — recommended, updates itself
+**Install one language only.** Two copies at once means two panels on the page.
+
+### With Tampermonkey — recommended, updates itself
 
 1. Install [Tampermonkey](https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo)
-2. Click **[ConZoL-Auto-Download.user.js](../../raw/main/ConZoL-Auto-Download.user.js)** → Install
+2. Click the version you want, then press **Install**
 
-New versions arrive on their own. Thai UI: [ConZoL-Auto-Download.th.user.js](../../raw/main/ConZoL-Auto-Download.th.user.js)
+| Language | Install link |
+|---|---|
+| English | [ConZoL-Auto-Download.user.js](../../raw/main/ConZoL-Auto-Download.user.js) |
+| ไทย | [ConZoL-Auto-Download.th.user.js](../../raw/main/ConZoL-Auto-Download.th.user.js) |
 
-### B. Chrome extension — no Tampermonkey needed
+New versions arrive on their own — nothing to re-send, nobody to chase.
 
-1. Download this repository (**Code → Download ZIP**) and unzip somewhere permanent
+### As a Chrome extension — no Tampermonkey needed
+
+1. **Code → Download ZIP**, unzip somewhere permanent
 2. `chrome://extensions` → **Developer mode** on → **Load unpacked**
-3. Select the `extension` folder
+3. Select `extension-en` (English) or `extension-th` (ไทย)
 
 No auto-update on this route.
 
@@ -58,21 +67,133 @@ download system. Nothing to configure, no save-as prompts, no leftover `.tmp` fi
 
 Folders named `_Deleted`, `_Archive`, `_Cancelled` are never scanned, moved or removed.
 
+**Requires** Chrome or Edge 111+. Reading an `.xlsx` loads a spreadsheet library from
+`cdnjs.cloudflare.com` on first use.
+
 ---
 
-## Requirements
+## Repository layout
 
-- Chrome or Edge 111+
-- Reading an `.xlsx` loads a spreadsheet library from `cdnjs.cloudflare.com` on first use
+```
+ConZoL-Auto-Download.user.js      English userscript  ← install link, do not move
+ConZoL-Auto-Download.th.user.js   Thai userscript     ← install link, do not move
+extension-en/                     English Chrome extension
+extension-th/                     Thai Chrome extension
+build.py  i18n-en.json  build.sh  build both languages from one source
+```
 
-## Releasing an update
+`ConZoL-Auto-Download.th.user.js` is the source of truth. The English build is generated
+from it through `i18n-en.json`, so a change only has to be made once.
 
-1. Edit the `.user.js`, raise `// @version`
-2. Commit and push
+### Releasing a change
 
-Tampermonkey installs it for everyone on its own. See [PUBLISH.txt](PUBLISH.txt) for the
-`@updateURL` setup and the Chrome Web Store notes.
+```bash
+# 1. edit ConZoL-Auto-Download.th.user.js
+# 2. raise // @version
+bash build.sh          # rebuilds all four outputs, fails if a string is untranslated
+git add -A && git commit -m "..." && git push
+```
+
+Tampermonkey installs the new version for everyone on its own.
+See [PUBLISH.txt](PUBLISH.txt) for the update-URL setup and Chrome Web Store notes.
 
 ## Licence
 
 MIT — see [LICENSE](LICENSE).
+
+---
+---
+
+# ConZoL Auto Download (ภาษาไทย)
+
+เครื่องมือช่วยงานเอกสารบน GULF ConZoL EDMS (`edms.gulf.co.th`)
+ดาวน์โหลดเอกสาร ตั้งชื่อไฟล์ให้ครบ แล้วแยกเข้าโฟลเดอร์ให้เองอัตโนมัติ
+
+ConZoL ให้มาแค่ `GMTP-1400-MA-DWG-401-T3.pdf`
+ตัวนี้ให้ `GMTP-1400-MA-DWG-401-T3_Berth # 1 Mooring Dolphin Deck Plan.pdf`
+พร้อมวางไว้ใน `MA-DWG MARINE Drawing\1400 Berth 1\` ให้เรียบร้อย
+
+---
+
+## วิธีติดตั้ง
+
+**เลือกภาษาเดียวเท่านั้น** ถ้าลงทั้งคู่จะมีกล่องซ้อนกัน 2 อัน
+
+### ผ่าน Tampermonkey — แนะนำ อัปเดตให้เอง
+
+1. ติดตั้ง [Tampermonkey](https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo)
+2. กดลิงก์ภาษาที่ต้องการ แล้วกด **Install**
+
+| ภาษา | ลิงก์ติดตั้ง |
+|---|---|
+| ไทย | [ConZoL-Auto-Download.th.user.js](../../raw/main/ConZoL-Auto-Download.th.user.js) |
+| English | [ConZoL-Auto-Download.user.js](../../raw/main/ConZoL-Auto-Download.user.js) |
+
+มีเวอร์ชันใหม่เมื่อไหร่ เครื่องทุกคนอัปเดตเอง ไม่ต้องไล่ส่งไฟล์
+
+### แบบ Chrome extension — ไม่ต้องใช้ Tampermonkey
+
+1. **Code → Download ZIP** แล้วแตกไฟล์ลงโฟลเดอร์ถาวร
+2. `chrome://extensions` → เปิด **Developer mode** → กด **Load unpacked**
+3. เลือกโฟลเดอร์ `extension-th` (ไทย) หรือ `extension-en` (อังกฤษ)
+
+ทางนี้ไม่มีอัปเดตอัตโนมัติ
+
+---
+
+## วิธีใช้
+
+1. เปิด `https://edms.gulf.co.th/dms/drawing.asp` แล้วล็อกอิน — กล่องจะโผล่มุมขวาบน
+2. กด **เลือกโฟลเดอร์…** ชี้ที่เก็บเอกสาร (ถามครั้งเดียว จำไว้ให้)
+3. ติ๊กชนิดไฟล์: **PDF** (คอลัมน์ PDF+) และ/หรือ **ไฟล์แนบต้นฉบับ** (คอลัมน์ FILE+ · `.zip`)
+4. เลือกวิธีโหลด
+   - กด SEARCH ตามปกติ แล้วกด **โหลดจากหน้านี้** หรือ
+   - เลือกไฟล์ MDR `.xlsx` แล้วกด **ค้น ConZoL + โหลดทั้งหมด**
+
+ปุ่ม **จัดโฟลเดอร์ใหม่** ใช้จัดไฟล์เก่าที่กองอยู่ให้เข้าที่
+
+---
+
+## สิ่งที่ทำให้อัตโนมัติ
+
+| | |
+|---|---|
+| **ชื่อไฟล์** | `<เลขเอกสาร>-<Rev>_<ชื่อเรื่อง>.<นามสกุล>` — ชื่อเรื่องดึงจาก ConZoL |
+| **โฟลเดอร์** | อ่านจากหัวกลุ่มที่ ConZoL พิมพ์มาเอง (`MA-CAL:MARINE Calculation`) ไม่ได้ฮาร์ดโค้ด มีกลุ่มใหม่ก็รองรับทันที |
+| **พื้นที่** | `1400`, `0500`, `PCC`, `CAZ` แยกเป็นโฟลเดอร์ย่อย ใส่ชื่อกำกับเพิ่มได้ที่ `AREA_LABELS` |
+| **Rev** | เก็บ Rev ล่าสุดไว้ ตัวเก่าย้ายเข้า `_Superseded\` |
+| **รันซ้ำ** | ข้ามไฟล์ที่มีอยู่แล้ว โหลดเฉพาะเอกสารใหม่กับ Rev ที่เปลี่ยน |
+| **เอกสารยกเลิก** | แถวที่ขีดฆ่าหรือเขียน *Delete* ใน MDR จะถูกข้าม |
+| **รายงาน** | ปุ่ม **บันทึกรายงาน CSV** สรุปว่าโหลดอะไร ข้ามอะไร อะไรไม่มีใน ConZoL |
+
+เขียนไฟล์ลงโฟลเดอร์โดยตรง ไม่ผ่านระบบ Download ของ Chrome — ไม่ต้องตั้งค่าอะไร
+ไม่มีหน้าต่างถามที่เก็บ ไม่มีไฟล์ `.tmp` ค้าง
+
+โฟลเดอร์ชื่อ `_Deleted`, `_Archive`, `_Cancelled` ระบบจะไม่แตะเลย
+
+**ต้องใช้** Chrome หรือ Edge 111 ขึ้นไป · การอ่าน `.xlsx` ครั้งแรกต้องต่อเน็ตได้
+เพื่อโหลดไลบรารีจาก `cdnjs.cloudflare.com`
+
+---
+
+## โครงสร้างไฟล์ใน repo
+
+```
+ConZoL-Auto-Download.user.js      userscript อังกฤษ  ← เป็นลิงก์ติดตั้ง ห้ามย้าย
+ConZoL-Auto-Download.th.user.js   userscript ไทย     ← เป็นลิงก์ติดตั้ง ห้ามย้าย
+extension-en/                     Chrome extension อังกฤษ
+extension-th/                     Chrome extension ไทย
+build.py  i18n-en.json  build.sh  ตัว build ทั้งสองภาษาจากต้นฉบับเดียว
+```
+
+ต้นฉบับคือ `ConZoL-Auto-Download.th.user.js` ตัวอังกฤษ generate จากไฟล์นี้ผ่าน `i18n-en.json`
+แก้ที่เดียวได้ครบทั้งคู่
+
+### ขั้นตอนออกเวอร์ชันใหม่
+
+```bash
+# 1. แก้ ConZoL-Auto-Download.th.user.js
+# 2. เพิ่มเลข // @version
+bash build.sh          # build ใหม่ทั้ง 4 ไฟล์ ถ้าแปลตกจะฟ้อง error
+git add -A && git commit -m "..." && git push
+```
