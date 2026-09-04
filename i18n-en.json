@@ -486,5 +486,25 @@
  [
   "   // ต้องมีนามสกุล",
   "   // must have an extension"
+ ],
+ [
+  "  // เช็คเงียบ ๆ ว่ามีเวอร์ชันใหม่บน GitHub ไหม — เข้าไม่ถึงก็ข้ามไป ไม่รบกวน",
+  "  // Quietly check GitHub for a newer version - stays silent if unreachable"
+ ],
+ [
+  "      b.title = 'มีเวอร์ชันใหม่ กดเพื่อติดตั้ง';",
+  "      b.title = 'A newer version is available - click to install';"
+ ],
+ [
+  "      log('มีเวอร์ชันใหม่ ' + m[1] + ' (ตอนนี้ ' + VERSION + ') — กดป้ายส้มบนหัวกล่องเพื่อติดตั้ง', 'wn');",
+  "      log('Version ' + m[1] + ' is available (running ' + VERSION + ') - click the orange tag in the title bar to install', 'wn');"
+ ],
+ [
+  "    } catch (e) { /* เงียบ */ }",
+  "    } catch (e) { /* ignore */ }"
+ ],
+ [
+  "   // build.py ใส่ให้ตามภาษา",
+  "   // filled in per language at build time"
  ]
 ]

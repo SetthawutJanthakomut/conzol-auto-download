@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GULF ConZoL - Auto Download + Rename + Sort
 // @namespace    gmtp.conzol
-// @version      4.4
+// @version      4.5
 // @description  Download PDFs and native attachments from GULF ConZoL EDMS automatically - names each file and sorts it into the folder ConZoL assigns.
 // @match        https://edms.gulf.co.th/dms/drawing.asp*
 // @match        http://edms.gulf.co.th/dms/drawing.asp*
@@ -20,7 +20,8 @@
   // If a panel already exists the later copy stops here - otherwise ids collide and buttons stop responding
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '4.4';   // kept in sync with @version at build time
+  const VERSION = '4.5';   // kept in sync with @version at build time
+  const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.user.js';   // filled in per language at build time
 
   // ---------------- Settings ----------------
   const CFG = {
@@ -381,8 +382,10 @@
       #edmsdl .ok{color:#2c7a2c}#edmsdl .er{color:#b02020}#edmsdl .sk{color:#888}#edmsdl .wn{color:#a06000}
       #edmsdl .st{font-weight:bold;margin-top:5px}
       #edmsdl .x{cursor:pointer;font-weight:normal}
+      #edmsdl .ver{font:9px Tahoma;font-weight:normal;opacity:.65;margin-left:5px;letter-spacing:.3px}
+      #edmsdl .ver.new{opacity:1;background:#d9822b;color:#fff;padding:1px 6px;border-radius:9px;cursor:pointer}
     </style>
-    <div class="hd"><span>⬇ ConZoL Auto Download v${VERSION}</span><span class="x" id="edl-min">–</span></div>
+    <div class="hd"><span>⬇ ConZoL Auto Download <span class="ver" id="edl-ver">v${VERSION}</span></span><span class="x" id="edl-min">–</span></div>
     <div class="bd" id="edl-body">
 
       <fieldset><legend>Destination folder</legend>
@@ -433,7 +436,7 @@
     const hd = box.querySelector('.hd');
     let sx, sy, ox, oy, drag = false;
     hd.onmousedown = (e) => {
-      if (e.target.id === 'edl-min') return;
+      if (e.target.id === 'edl-min' || e.target.id === 'edl-ver') return;
       drag = true; sx = e.clientX; sy = e.clientY;
       const r = box.getBoundingClientRect(); ox = r.left; oy = r.top; e.preventDefault();
     };
@@ -606,6 +609,24 @@
         el('edl-dirinfo').textContent = `📁 ${h.name} — press a download button and allow access again`;
       }
     } catch (e) { showDirInfo(); }
+  })();
+
+  // Quietly check GitHub for a newer version - stays silent if unreachable
+  (async () => {
+    if (!/^https?:/.test(UPDATE_URL)) return;
+    try {
+      const r = await fetch(UPDATE_URL + '?t=' + Date.now(), { cache: 'no-store' });
+      if (!r.ok) return;
+      const m = /@version\s+(\S+)/.exec((await r.text()).slice(0, 2000));
+      if (!m || m[1] === VERSION) return;
+      const b = el('edl-ver');
+      if (!b) return;
+      b.textContent = 'v' + VERSION + ' → ' + m[1];
+      b.className = 'ver new';
+      b.title = 'A newer version is available - click to install';
+      b.onclick = (e) => { e.stopPropagation(); window.open(UPDATE_URL, '_blank'); };
+      log('Version ' + m[1] + ' is available (running ' + VERSION + ') - click the orange tag in the title bar to install', 'wn');
+    } catch (e) { /* ignore */ }
   })();
 
   el('edl-stop').onclick = () => { stopFlag = true; statusEl.textContent = 'Stopping…'; };

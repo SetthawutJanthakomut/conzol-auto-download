@@ -40,9 +40,10 @@ for a, b in [("'LIBFAIL'", "'โหลดไลบรารีไม่สำเ
              ("'LIBNET'", "'เข้าถึง cdnjs.cloudflare.com ไม่ได้'"),
              ("'LIBTIMEOUT'", "'หมดเวลารอไลบรารี'")]:
     ext_th = ext_th.replace(a, b)
+ext_th = ext_th.replace('__UPDATE_URL__', RAW + 'ConZoL-Auto-Download.th.user.js')
 open('build-th/conzol.js', 'w', encoding='utf-8').write('// ConZoL Auto Download - Chrome Extension build\n\n' + ext_th)
 
-th_us = s
+th_us = s.replace('__UPDATE_URL__', RAW + 'ConZoL-Auto-Download.th.user.js')
 if '@updateURL' not in th_us:
     u = RAW + 'ConZoL-Auto-Download.th.user.js'
     th_us = th_us.replace('// @run-at       document-idle',
@@ -57,6 +58,7 @@ for a, b in M:
     if a not in en:
         miss.append(a[:60])
     en = en.replace(a, b)
+en = en.replace(RAW + 'ConZoL-Auto-Download.th.user.js', RAW + 'ConZoL-Auto-Download.user.js')
 open('build-en/conzol.js', 'w', encoding='utf-8').write(en)
 
 hdr = """// ==UserScript==

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GULF ConZoL – Auto Download + Rename + Sort (MDR)
 // @namespace    gmtp.marine.jay
-// @version      4.4
+// @version      4.5
 // @description  ดาวน์โหลด PDF และไฟล์แนบ (FILE+) จาก ConZoL ลงโฟลเดอร์ที่เลือกไว้โดยตรง (ไม่ผ่าน Download ของ Chrome) ตั้งชื่อ <DocNo>-<Rev>_<Title>.pdf แยกโฟลเดอร์ตามหมวด ย้าย Rev เก่าเข้า _Superseded และอ่านรายการจากไฟล์ MDR ให้เอง
 // @author       JAY
 // @match        https://edms.gulf.co.th/dms/drawing.asp*
@@ -20,7 +20,8 @@
   // ถ้ามีกล่องอยู่แล้ว ให้ชุดที่มาทีหลังหยุดทำงาน ไม่งั้น id จะซ้ำและปุ่มจะกดไม่ติด
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '4.4';   // ซิงก์อัตโนมัติจาก @version ตอน build
+  const VERSION = '4.5';   // ซิงก์อัตโนมัติจาก @version ตอน build
+  const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.th.user.js';   // build.py ใส่ให้ตามภาษา
 
   // ---------------- ตั้งค่าได้ตรงนี้ ----------------
   const CFG = {
@@ -364,8 +365,10 @@
       #edmsdl .ok{color:#2c7a2c}#edmsdl .er{color:#b02020}#edmsdl .sk{color:#888}#edmsdl .wn{color:#a06000}
       #edmsdl .st{font-weight:bold;margin-top:5px}
       #edmsdl .x{cursor:pointer;font-weight:normal}
+      #edmsdl .ver{font:9px Tahoma;font-weight:normal;opacity:.65;margin-left:5px;letter-spacing:.3px}
+      #edmsdl .ver.new{opacity:1;background:#d9822b;color:#fff;padding:1px 6px;border-radius:9px;cursor:pointer}
     </style>
-    <div class="hd"><span>⬇ ConZoL Auto Download v${VERSION}</span><span class="x" id="edl-min">–</span></div>
+    <div class="hd"><span>⬇ ConZoL Auto Download <span class="ver" id="edl-ver">v${VERSION}</span></span><span class="x" id="edl-min">–</span></div>
     <div class="bd" id="edl-body">
 
       <fieldset><legend>โฟลเดอร์ปลายทาง</legend>
@@ -416,7 +419,7 @@
     const hd = box.querySelector('.hd');
     let sx, sy, ox, oy, drag = false;
     hd.onmousedown = (e) => {
-      if (e.target.id === 'edl-min') return;
+      if (e.target.id === 'edl-min' || e.target.id === 'edl-ver') return;
       drag = true; sx = e.clientX; sy = e.clientY;
       const r = box.getBoundingClientRect(); ox = r.left; oy = r.top; e.preventDefault();
     };
@@ -589,6 +592,24 @@
         el('edl-dirinfo').textContent = `📁 ${h.name} — กดปุ่มโหลดแล้วอนุญาตสิทธิ์อีกครั้ง`;
       }
     } catch (e) { showDirInfo(); }
+  })();
+
+  // เช็คเงียบ ๆ ว่ามีเวอร์ชันใหม่บน GitHub ไหม — เข้าไม่ถึงก็ข้ามไป ไม่รบกวน
+  (async () => {
+    if (!/^https?:/.test(UPDATE_URL)) return;
+    try {
+      const r = await fetch(UPDATE_URL + '?t=' + Date.now(), { cache: 'no-store' });
+      if (!r.ok) return;
+      const m = /@version\s+(\S+)/.exec((await r.text()).slice(0, 2000));
+      if (!m || m[1] === VERSION) return;
+      const b = el('edl-ver');
+      if (!b) return;
+      b.textContent = 'v' + VERSION + ' → ' + m[1];
+      b.className = 'ver new';
+      b.title = 'มีเวอร์ชันใหม่ กดเพื่อติดตั้ง';
+      b.onclick = (e) => { e.stopPropagation(); window.open(UPDATE_URL, '_blank'); };
+      log('มีเวอร์ชันใหม่ ' + m[1] + ' (ตอนนี้ ' + VERSION + ') — กดป้ายส้มบนหัวกล่องเพื่อติดตั้ง', 'wn');
+    } catch (e) { /* เงียบ */ }
   })();
 
   el('edl-stop').onclick = () => { stopFlag = true; statusEl.textContent = 'กำลังหยุด…'; };
