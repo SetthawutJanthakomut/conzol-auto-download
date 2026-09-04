@@ -120,6 +120,23 @@ GOOD TO KNOW
 
 
 -----------------------------------------------------------
+Using Tampermonkey instead?  Turn on Allow User Scripts
+-----------------------------------------------------------
+Not needed for the extension route (Load unpacked), but
+Tampermonkey will not run any script until this is enabled.
+
+1. Open in Chrome:
+   chrome://extensions/?id=dhdgffkkebhmkfjojejmpbldmpobfkfo
+
+2. Switch  Allow User Scripts  on
+
+3. If the switch is not there, turn on Developer mode
+   (top right of chrome://extensions) first and it appears
+
+Symptom when missed: the script installs fine, but no panel
+ever shows up on the ConZoL page.
+
+-----------------------------------------------------------
 TROUBLESHOOTING
 -----------------------------------------------------------
 No panel in the top right corner
