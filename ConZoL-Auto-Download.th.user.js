@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GULF ConZoL – Auto Download + Rename + Sort (MDR)
 // @namespace    gmtp.marine.jay
-// @version      4.7
+// @version      4.8
 // @description  ดาวน์โหลด PDF และไฟล์แนบ (FILE+) จาก ConZoL ลงโฟลเดอร์ที่เลือกไว้โดยตรง (ไม่ผ่าน Download ของ Chrome) ตั้งชื่อ <DocNo>-<Rev>_<Title>.pdf แยกโฟลเดอร์ตามหมวด ย้าย Rev เก่าเข้า _Superseded และอ่านรายการจากไฟล์ MDR ให้เอง
 // @author       JAY
 // @match        https://edms.gulf.co.th/dms/drawing.asp*
@@ -20,7 +20,7 @@
   // ถ้ามีกล่องอยู่แล้ว ให้ชุดที่มาทีหลังหยุดทำงาน ไม่งั้น id จะซ้ำและปุ่มจะกดไม่ติด
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '4.7';   // ซิงก์อัตโนมัติจาก @version ตอน build
+  const VERSION = '4.8';   // ซิงก์อัตโนมัติจาก @version ตอน build
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.th.user.js';   // build.py ใส่ให้ตามภาษา
 
   // ---------------- ตั้งค่าได้ตรงนี้ ----------------
@@ -395,6 +395,11 @@
         <textarea id="edl-exclude" rows="2" style="width:100%;font:10px Consolas,monospace" placeholder="เช่น GMTP-MA-RPT-012"></textarea>
         <button class="chk" id="edl-checkmdr">เช็คก่อน (ไม่โหลดจริง)</button>
         <button class="go2" id="edl-runmdr">ค้น ConZoL + โหลดทั้งหมด</button>
+      </fieldset>
+
+      <fieldset><legend>3) ทำรายการเอกสารเป็น Excel</legend>
+        <div>discipline: <input id="edl-listdisc" style="width:210px;font:10px Consolas,monospace" placeholder="เว้นว่าง = ทุกอย่าง · เช่น MA-DWG, MA-CAL"></div>
+        <button class="chk" id="edl-list">สร้างไฟล์รายการ (.xlsx)</button>
       </fieldset>
 
       <fieldset style="margin-top:2px"><legend>ชนิดไฟล์ที่จะโหลด</legend>
@@ -887,4 +892,180 @@
   }
   el('edl-runmdr').onclick = () => runMdr(false);
   el('edl-checkmdr').onclick = () => runMdr(true);
+
+  // ============ โหมด 3 — ทำรายการเอกสารเป็น Excel ============
+  // ชื่อเรื่องอยู่ในชื่อไฟล์ หลัง "<DocNo>-<Rev>_" จนถึงนามสกุล
+  function titleFromFile(name) {
+    const m = FN_RE.exec(name);
+    if (!m) return '';
+    let t = name.slice(m[0].length);
+    const dot = t.lastIndexOf('.');
+    if (dot > 0) t = t.slice(0, dot);
+    return t.trim();
+  }
+
+  async function collectFolderRows() {
+    const out = [];
+    if (!rootDir) return out;
+    if (!existing.size) await refreshExisting();
+    for (const doc of [...existing.keys()].sort()) {
+      const list = existing.get(doc) || [];
+      const top = new Map();   // นามสกุล -> rank สูงสุด = ตัวล่าสุด
+      for (const it of list) {
+        const e = it.ext || 'pdf';
+        if (!top.has(e) || it.rank > top.get(e)) top.set(e, it.rank);
+      }
+      const sorted = [...list].sort((a, b) => (b.rank - a.rank) ||
+        String(a.ext || '').localeCompare(String(b.ext || '')));
+      for (const it of sorted) {
+        let size = '', mtime = '';
+        try {
+          const f = await it.handle.getFile();
+          size = Math.round(f.size / 10485.76) / 100;
+          const d = new Date(f.lastModified);
+          mtime = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') +
+                  '-' + String(d.getDate()).padStart(2, '0');
+        } catch (e) {}
+        out.push({
+          doc, rev: it.rev, rank: it.rank,
+          title: titleFromFile(it.name),
+          file: it.name,
+          ext: String(it.ext || '').toUpperCase(),
+          folder: (it.path || []).join('\\') || '.',
+          status: it.rank === top.get(it.ext || 'pdf') ? 'Current' : 'Superseded',
+          size, mtime
+        });
+      }
+    }
+    return out;
+  }
+
+  async function collectConzolRows(discList) {
+    const dstatus = el('edl-inactive').checked ? '' : 'A';
+    const index = new Map();
+    for (const disc of discList) {
+      if (stopFlag) break;
+      let page = 1, total = 1;
+      do {
+        statusEl.textContent = `กำลังค้น ConZoL: ${disc || 'ทั้งหมด'} หน้า ${page} …`;
+        const extra = { worktype: disc, dstatus, page: String(page) };
+        if (page > 1) extra.pagechange = '1';
+        const { rows, pages } = await searchPage(extra);
+        total = Math.max(pages.length || 1, total);
+        rows.forEach((r) => { const k = norm(r.doc); if (!index.has(k)) index.set(k, { ...r, disc }); });
+        log(`  · ${disc || 'ทั้งหมด'} หน้า ${page}/${total} → ${rows.length}`, 'sk');
+        page++; await sleep(CFG.searchDelayMs);
+      } while (page <= total && !stopFlag);
+    }
+    return [...index.values()];
+  }
+
+  function mkSheet(aoa, widths) {
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = widths.map((w) => ({ wch: w }));
+    ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 },
+      e: { r: Math.max(aoa.length - 1, 1), c: widths.length - 1 } }) };
+    return ws;
+  }
+
+  async function makeLists() {
+    if (running) return;
+    running = true; stopFlag = false; logEl.innerHTML = '';
+    try {
+      if (typeof XLSX === 'undefined') throw new Error('โหลดไลบรารีอ่าน .xlsx ไม่ได้');
+
+      // ---- ชีต 1: ไฟล์ที่มีอยู่ในโฟลเดอร์ ----
+      let fRows = [];
+      if (rootDir && await ensurePermission()) {
+        statusEl.textContent = 'กำลังอ่านโฟลเดอร์ …';
+        log('อ่านไฟล์ในโฟลเดอร์ปลายทาง …');
+        await refreshExisting();
+        fRows = await collectFolderRows();
+        log(`  พบไฟล์ ${fRows.length} ไฟล์ · ${existing.size} เลขเอกสาร`, 'ok');
+      } else {
+        log('· ยังไม่ได้เลือกโฟลเดอร์ปลายทาง — ชีต Folder จะว่าง', 'wn');
+      }
+
+      // ---- ชีต 2: เอกสารใน ConZoL ----
+      const codes = disciplineCodes();
+      const typed = String(el('edl-listdisc').value || '')
+        .split(/[,\s]+/).map((s) => s.trim().toUpperCase()).filter(Boolean);
+      const bad = typed.filter((d) => !codes.has(d));
+      if (bad.length) log('· ไม่มี discipline นี้ใน ConZoL: ' + bad.join(', '), 'wn');
+      const discList = typed.filter((d) => codes.has(d));
+      if (!discList.length) discList.push(...[...codes].sort());
+      log(`ค้น ConZoL ${discList.length} discipline: ${discList.join(', ')}`);
+      const cRows = await collectConzolRows(discList);
+      log(`  พบเอกสาร ${cRows.length} รายการ`, cRows.length ? 'ok' : 'wn');
+
+      // ---- ชีต 3: เทียบกัน ----
+      const byDocFolder = new Map();
+      for (const r of fRows) {
+        const k = norm(r.doc);
+        if (!byDocFolder.has(k) || r.rank > byDocFolder.get(k).rank) byDocFolder.set(k, r);
+      }
+      const byDocConzol = new Map();
+      for (const r of cRows) byDocConzol.set(norm(r.doc), r);
+
+      const rankOf = (rev) => { const m = /^([TR])(\d+)$/i.exec(String(rev || '')); return m ? revRank(m[1], m[2]) : -1; };
+      const cmp = [];
+      for (const k of new Set([...byDocConzol.keys(), ...byDocFolder.keys()])) {
+        const c = byDocConzol.get(k), f = byDocFolder.get(k);
+        let result;
+        if (c && !f) result = 'ยังไม่มีในโฟลเดอร์ — ต้องโหลด';
+        else if (f && !c) result = 'ไม่พบใน ConZoL';
+        else {
+          const rc = rankOf(c.rev), rf = rankOf(f.rev);
+          if (rc === rf) result = 'ตรงกัน';
+          else if (rc > rf) result = 'ConZoL ใหม่กว่า — ต้องโหลด';
+          else result = 'ในโฟลเดอร์ใหม่กว่า ConZoL';
+        }
+        cmp.push({
+          doc: (c && c.doc) || (f && f.doc) || k,
+          title: (c && c.title) || (f && f.title) || '',
+          crev: c ? c.rev : '', frev: f ? f.rev : '',
+          folder: f ? f.folder : (c ? targetPath(c.doc, c.groupCode, c.groupName).join('\\') : ''),
+          result
+        });
+      }
+      cmp.sort((a, b) => a.doc.localeCompare(b.doc));
+
+      // ---- เขียนไฟล์ ----
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, mkSheet(
+        [['S/N', 'Document No.', 'Rev', 'Title', 'File Name', 'Type', 'Folder', 'Status', 'Size (MB)', 'Modified']]
+          .concat(fRows.map((r, i) => [i + 1, r.doc, r.rev, r.title, r.file, r.ext, r.folder, r.status, r.size, r.mtime])),
+        [6, 26, 6, 46, 52, 7, 34, 12, 10, 12]), 'Folder');
+
+      XLSX.utils.book_append_sheet(wb, mkSheet(
+        [['S/N', 'Document No.', 'Rev', 'Title', 'Discipline', 'Group Code', 'Group Name', 'Area', 'PDF', 'Native File', 'Target Folder']]
+          .concat(cRows.map((r, i) => [i + 1, r.doc, r.rev, r.title, r.disc || '', r.groupCode || '', r.groupName || '',
+            areaOf(r.doc, r.groupCode), 'Y', r.fileHref ? String(r.fileExt || 'zip').toUpperCase() : '',
+            targetPath(r.doc, r.groupCode, r.groupName).join('\\')])),
+        [6, 26, 6, 46, 11, 12, 30, 10, 5, 11, 34]), 'ConZoL');
+
+      XLSX.utils.book_append_sheet(wb, mkSheet(
+        [['S/N', 'Document No.', 'Title', 'ConZoL Rev', 'Folder Rev', 'Folder', 'Result']]
+          .concat(cmp.map((r, i) => [i + 1, r.doc, r.title, r.crev, r.frev, r.folder, r.result])),
+        [6, 26, 46, 11, 11, 34, 30]), 'Compare');
+
+      const d = new Date();
+      const stamp = d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0');
+      const name = `ConZoL_document_list_${stamp}.xlsx`;
+      const blob = new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })],
+        { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      if (rootDir && await ensurePermission()) { await writeInto(rootDir, name, blob); log('· บันทึก ' + name + ' ลงโฟลเดอร์แล้ว', 'ok'); }
+      else browserDownload(name, blob);
+
+      const need = cmp.filter((r) => /ต้องโหลด/.test(r.result)).length;
+      statusEl.textContent = `รายการเสร็จ: โฟลเดอร์ ${fRows.length} ไฟล์ · ConZoL ${cRows.length} รายการ · ยังไม่ครบ ${need}`;
+      log('— จบการทำรายการ —');
+    } catch (e) {
+      log('· ทำรายการไม่สำเร็จ: ' + e.message, 'er');
+      statusEl.textContent = 'ทำรายการไม่สำเร็จ';
+    }
+    showDirInfo();
+    running = false;
+  }
+  el('edl-list').onclick = () => makeLists();
 })();

@@ -65,6 +65,17 @@ what would be skipped and which revisions would move to `_Superseded`, and lists
 without writing a single file. **Save CSV report** works after a check too, so you can review the
 plan in Excel before committing to it.
 
+**Build list (.xlsx)** produces one workbook with three sheets, in the destination folder:
+
+| Sheet | What's in it |
+|---|---|
+| **Folder** | every document file on disk — document no., revision, title, file name, type, folder, Current/Superseded, size, date |
+| **ConZoL** | every document ConZoL holds for the disciplines you asked for — revision, title, group, area, whether a native attachment exists, and the folder it belongs in |
+| **Compare** | the two sides side by side — *Up to date*, *ConZoL is newer - to download*, *Not in the folder yet - to download*, *Not found in ConZoL* |
+
+Leave the discipline box empty for every discipline in ConZoL's dropdown, or type the ones you want
+(`MA-DWG, MA-CAL`). It reads like an MDR and opens straight in Excel.
+
 **Re-sort folders** tidies files already on disk.
 
 ---
@@ -186,6 +197,17 @@ chrome://extensions/?id=dhdgffkkebhmkfjojejmpbldmpobfkfo
 ปุ่ม **เช็คก่อน (ไม่โหลดจริง)** จะไล่ดูให้ครบว่าจะโหลดอะไรบ้าง ข้ามอะไร และตัวไหนจะถูกย้ายเข้า
 `_Superseded` แล้วแสดงในบันทึกการทำงาน โดยไม่เขียนไฟล์จริงสักไฟล์ กด **บันทึกรายงาน CSV**
 หลังเช็คได้เลย จะได้เอาไปดูใน Excel ก่อนตัดสินใจโหลดจริง
+
+ปุ่ม **สร้างไฟล์รายการ (.xlsx)** จะได้ไฟล์เดียว 3 ชีต เก็บลงโฟลเดอร์ปลายทางให้เลย
+
+| ชีต | มีอะไร |
+|---|---|
+| **Folder** | ไฟล์ทุกไฟล์ที่มีอยู่ในโฟลเดอร์ — เลขเอกสาร, Rev, ชื่อเรื่อง, ชื่อไฟล์, ชนิด, โฟลเดอร์, Current/Superseded, ขนาด, วันที่ |
+| **ConZoL** | เอกสารทุกตัวที่มีใน ConZoL ตาม discipline ที่เลือก — Rev, ชื่อเรื่อง, กลุ่ม, พื้นที่, มีไฟล์แนบไหม และโฟลเดอร์ที่ควรอยู่ |
+| **Compare** | เทียบสองฝั่ง — *Up to date*, *ConZoL ใหม่กว่า — ต้องโหลด*, *ยังไม่มีในโฟลเดอร์ — ต้องโหลด*, *ไม่พบใน ConZoL* |
+
+ช่อง discipline เว้นว่าง = ไล่ทุกอย่างที่มีใน dropdown ของ ConZoL หรือพิมพ์เฉพาะที่ต้องการก็ได้
+(`MA-DWG, MA-CAL`) หน้าตาอ่านง่ายคล้าย MDR เปิดใน Excel ได้เลย
 
 ปุ่ม **จัดโฟลเดอร์ใหม่** ใช้จัดไฟล์เก่าที่กองอยู่ให้เข้าที่
 

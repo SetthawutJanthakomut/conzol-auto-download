@@ -546,5 +546,121 @@
  [
   "'— จบการเช็ค (ยังไม่ได้โหลด) — กด \"บันทึกรายงาน CSV\" เพื่อเก็บผล'",
   "'— Check finished (nothing downloaded) — press \"Save CSV report\" to keep the list'"
+ ],
+ [
+  "<legend>3) ทำรายการเอกสารเป็น Excel</legend>",
+  "<legend>3) Document list (Excel)</legend>"
+ ],
+ [
+  "placeholder=\"เว้นว่าง = ทุกอย่าง · เช่น MA-DWG, MA-CAL\"",
+  "placeholder=\"blank = every discipline · e.g. MA-DWG, MA-CAL\""
+ ],
+ [
+  ">สร้างไฟล์รายการ (.xlsx)</button>",
+  ">Build list (.xlsx)</button>"
+ ],
+ [
+  "// ============ โหมด 3 — ทำรายการเอกสารเป็น Excel ============",
+  "// ============ Mode 3 - build a document list as Excel ============"
+ ],
+ [
+  "// ชื่อเรื่องอยู่ในชื่อไฟล์ หลัง \"<DocNo>-<Rev>_\" จนถึงนามสกุล",
+  "// The title sits in the file name, after \"<DocNo>-<Rev>_\" and before the extension"
+ ],
+ [
+  "// นามสกุล -> rank สูงสุด = ตัวล่าสุด",
+  "// extension -> highest rank = the current revision"
+ ],
+ [
+  "`กำลังค้น ConZoL: ${disc || 'ทั้งหมด'} หน้า ${page} …`",
+  "`Searching ConZoL: ${disc || 'all'} page ${page} …`"
+ ],
+ [
+  "`  · ${disc || 'ทั้งหมด'} หน้า ${page}/${total} → ${rows.length}`",
+  "`  · ${disc || 'all'} page ${page}/${total} → ${rows.length}`"
+ ],
+ [
+  "// ---- ชีต 1: ไฟล์ที่มีอยู่ในโฟลเดอร์ ----",
+  "// ---- Sheet 1: the files already in the folder ----"
+ ],
+ [
+  "'กำลังอ่านโฟลเดอร์ …'",
+  "'Reading the folder …'"
+ ],
+ [
+  "'อ่านไฟล์ในโฟลเดอร์ปลายทาง …'",
+  "'Reading the destination folder …'"
+ ],
+ [
+  "`  พบไฟล์ ${fRows.length} ไฟล์ · ${existing.size} เลขเอกสาร`",
+  "`  ${fRows.length} files · ${existing.size} document numbers`"
+ ],
+ [
+  "'· ยังไม่ได้เลือกโฟลเดอร์ปลายทาง — ชีต Folder จะว่าง'",
+  "'· No destination folder chosen - the Folder sheet will be empty'"
+ ],
+ [
+  "// ---- ชีต 2: เอกสารใน ConZoL ----",
+  "// ---- Sheet 2: the documents in ConZoL ----"
+ ],
+ [
+  "'· ไม่มี discipline นี้ใน ConZoL: '",
+  "'· ConZoL has no such discipline: '"
+ ],
+ [
+  "`ค้น ConZoL ${discList.length} discipline: ${discList.join(', ')}`",
+  "`Searching ConZoL - ${discList.length} discipline(s): ${discList.join(', ')}`"
+ ],
+ [
+  "`  พบเอกสาร ${cRows.length} รายการ`",
+  "`  ${cRows.length} documents found`"
+ ],
+ [
+  "// ---- ชีต 3: เทียบกัน ----",
+  "// ---- Sheet 3: the two sides compared ----"
+ ],
+ [
+  "'ยังไม่มีในโฟลเดอร์ — ต้องโหลด'",
+  "'Not in the folder yet - to download'"
+ ],
+ [
+  "'ไม่พบใน ConZoL'",
+  "'Not found in ConZoL'"
+ ],
+ [
+  "'ตรงกัน'",
+  "'Up to date'"
+ ],
+ [
+  "'ConZoL ใหม่กว่า — ต้องโหลด'",
+  "'ConZoL is newer - to download'"
+ ],
+ [
+  "'ในโฟลเดอร์ใหม่กว่า ConZoL'",
+  "'The folder is newer than ConZoL'"
+ ],
+ [
+  "// ---- เขียนไฟล์ ----",
+  "// ---- Write the workbook ----"
+ ],
+ [
+  "/ต้องโหลด/",
+  "/to download/"
+ ],
+ [
+  "`รายการเสร็จ: โฟลเดอร์ ${fRows.length} ไฟล์ · ConZoL ${cRows.length} รายการ · ยังไม่ครบ ${need}`",
+  "`List built: folder ${fRows.length} files · ConZoL ${cRows.length} documents · missing ${need}`"
+ ],
+ [
+  "'— จบการทำรายการ —'",
+  "'— List finished —'"
+ ],
+ [
+  "'· ทำรายการไม่สำเร็จ: '",
+  "'· Could not build the list: '"
+ ],
+ [
+  "'ทำรายการไม่สำเร็จ'",
+  "'Could not build the list'"
  ]
 ]

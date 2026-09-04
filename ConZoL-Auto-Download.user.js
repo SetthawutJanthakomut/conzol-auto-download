@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GULF ConZoL - Auto Download + Rename + Sort
 // @namespace    gmtp.conzol
-// @version      4.7
+// @version      4.8
 // @description  Download PDFs and native attachments from GULF ConZoL EDMS automatically - names each file and sorts it into the folder ConZoL assigns.
 // @match        https://edms.gulf.co.th/dms/drawing.asp*
 // @match        http://edms.gulf.co.th/dms/drawing.asp*
@@ -20,7 +20,7 @@
   // If a panel already exists the later copy stops here - otherwise ids collide and buttons stop responding
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '4.7';   // kept in sync with @version at build time
+  const VERSION = '4.8';   // kept in sync with @version at build time
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.user.js';   // filled in per language at build time
 
   // ---------------- Settings ----------------
@@ -412,6 +412,11 @@
         <textarea id="edl-exclude" rows="2" style="width:100%;font:10px Consolas,monospace" placeholder="e.g. GMTP-MA-RPT-012"></textarea>
         <button class="chk" id="edl-checkmdr">Check first (no download)</button>
         <button class="go2" id="edl-runmdr">Search ConZoL + download all</button>
+      </fieldset>
+
+      <fieldset><legend>3) Document list (Excel)</legend>
+        <div>discipline: <input id="edl-listdisc" style="width:210px;font:10px Consolas,monospace" placeholder="blank = every discipline · e.g. MA-DWG, MA-CAL"></div>
+        <button class="chk" id="edl-list">Build list (.xlsx)</button>
       </fieldset>
 
       <fieldset style="margin-top:2px"><legend>What to download</legend>
@@ -904,4 +909,180 @@
   }
   el('edl-runmdr').onclick = () => runMdr(false);
   el('edl-checkmdr').onclick = () => runMdr(true);
+
+  // ============ Mode 3 - build a document list as Excel ============
+  // The title sits in the file name, after "<DocNo>-<Rev>_" and before the extension
+  function titleFromFile(name) {
+    const m = FN_RE.exec(name);
+    if (!m) return '';
+    let t = name.slice(m[0].length);
+    const dot = t.lastIndexOf('.');
+    if (dot > 0) t = t.slice(0, dot);
+    return t.trim();
+  }
+
+  async function collectFolderRows() {
+    const out = [];
+    if (!rootDir) return out;
+    if (!existing.size) await refreshExisting();
+    for (const doc of [...existing.keys()].sort()) {
+      const list = existing.get(doc) || [];
+      const top = new Map();   // extension -> highest rank = the current revision
+      for (const it of list) {
+        const e = it.ext || 'pdf';
+        if (!top.has(e) || it.rank > top.get(e)) top.set(e, it.rank);
+      }
+      const sorted = [...list].sort((a, b) => (b.rank - a.rank) ||
+        String(a.ext || '').localeCompare(String(b.ext || '')));
+      for (const it of sorted) {
+        let size = '', mtime = '';
+        try {
+          const f = await it.handle.getFile();
+          size = Math.round(f.size / 10485.76) / 100;
+          const d = new Date(f.lastModified);
+          mtime = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') +
+                  '-' + String(d.getDate()).padStart(2, '0');
+        } catch (e) {}
+        out.push({
+          doc, rev: it.rev, rank: it.rank,
+          title: titleFromFile(it.name),
+          file: it.name,
+          ext: String(it.ext || '').toUpperCase(),
+          folder: (it.path || []).join('\\') || '.',
+          status: it.rank === top.get(it.ext || 'pdf') ? 'Current' : 'Superseded',
+          size, mtime
+        });
+      }
+    }
+    return out;
+  }
+
+  async function collectConzolRows(discList) {
+    const dstatus = el('edl-inactive').checked ? '' : 'A';
+    const index = new Map();
+    for (const disc of discList) {
+      if (stopFlag) break;
+      let page = 1, total = 1;
+      do {
+        statusEl.textContent = `Searching ConZoL: ${disc || 'all'} page ${page} …`;
+        const extra = { worktype: disc, dstatus, page: String(page) };
+        if (page > 1) extra.pagechange = '1';
+        const { rows, pages } = await searchPage(extra);
+        total = Math.max(pages.length || 1, total);
+        rows.forEach((r) => { const k = norm(r.doc); if (!index.has(k)) index.set(k, { ...r, disc }); });
+        log(`  · ${disc || 'all'} page ${page}/${total} → ${rows.length}`, 'sk');
+        page++; await sleep(CFG.searchDelayMs);
+      } while (page <= total && !stopFlag);
+    }
+    return [...index.values()];
+  }
+
+  function mkSheet(aoa, widths) {
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = widths.map((w) => ({ wch: w }));
+    ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 },
+      e: { r: Math.max(aoa.length - 1, 1), c: widths.length - 1 } }) };
+    return ws;
+  }
+
+  async function makeLists() {
+    if (running) return;
+    running = true; stopFlag = false; logEl.innerHTML = '';
+    try {
+      await ensureXLSX();
+
+      // ---- Sheet 1: the files already in the folder ----
+      let fRows = [];
+      if (rootDir && await ensurePermission()) {
+        statusEl.textContent = 'Reading the folder …';
+        log('Reading the destination folder …');
+        await refreshExisting();
+        fRows = await collectFolderRows();
+        log(`  ${fRows.length} files · ${existing.size} document numbers`, 'ok');
+      } else {
+        log('· No destination folder chosen - the Folder sheet will be empty', 'wn');
+      }
+
+      // ---- Sheet 2: the documents in ConZoL ----
+      const codes = disciplineCodes();
+      const typed = String(el('edl-listdisc').value || '')
+        .split(/[,\s]+/).map((s) => s.trim().toUpperCase()).filter(Boolean);
+      const bad = typed.filter((d) => !codes.has(d));
+      if (bad.length) log('· ConZoL has no such discipline: ' + bad.join(', '), 'wn');
+      const discList = typed.filter((d) => codes.has(d));
+      if (!discList.length) discList.push(...[...codes].sort());
+      log(`Searching ConZoL - ${discList.length} discipline(s): ${discList.join(', ')}`);
+      const cRows = await collectConzolRows(discList);
+      log(`  ${cRows.length} documents found`, cRows.length ? 'ok' : 'wn');
+
+      // ---- Sheet 3: the two sides compared ----
+      const byDocFolder = new Map();
+      for (const r of fRows) {
+        const k = norm(r.doc);
+        if (!byDocFolder.has(k) || r.rank > byDocFolder.get(k).rank) byDocFolder.set(k, r);
+      }
+      const byDocConzol = new Map();
+      for (const r of cRows) byDocConzol.set(norm(r.doc), r);
+
+      const rankOf = (rev) => { const m = /^([TR])(\d+)$/i.exec(String(rev || '')); return m ? revRank(m[1], m[2]) : -1; };
+      const cmp = [];
+      for (const k of new Set([...byDocConzol.keys(), ...byDocFolder.keys()])) {
+        const c = byDocConzol.get(k), f = byDocFolder.get(k);
+        let result;
+        if (c && !f) result = 'Not in the folder yet - to download';
+        else if (f && !c) result = 'Not found in ConZoL';
+        else {
+          const rc = rankOf(c.rev), rf = rankOf(f.rev);
+          if (rc === rf) result = 'Up to date';
+          else if (rc > rf) result = 'ConZoL is newer - to download';
+          else result = 'The folder is newer than ConZoL';
+        }
+        cmp.push({
+          doc: (c && c.doc) || (f && f.doc) || k,
+          title: (c && c.title) || (f && f.title) || '',
+          crev: c ? c.rev : '', frev: f ? f.rev : '',
+          folder: f ? f.folder : (c ? targetPath(c.doc, c.groupCode, c.groupName).join('\\') : ''),
+          result
+        });
+      }
+      cmp.sort((a, b) => a.doc.localeCompare(b.doc));
+
+      // ---- Write the workbook ----
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, mkSheet(
+        [['S/N', 'Document No.', 'Rev', 'Title', 'File Name', 'Type', 'Folder', 'Status', 'Size (MB)', 'Modified']]
+          .concat(fRows.map((r, i) => [i + 1, r.doc, r.rev, r.title, r.file, r.ext, r.folder, r.status, r.size, r.mtime])),
+        [6, 26, 6, 46, 52, 7, 34, 12, 10, 12]), 'Folder');
+
+      XLSX.utils.book_append_sheet(wb, mkSheet(
+        [['S/N', 'Document No.', 'Rev', 'Title', 'Discipline', 'Group Code', 'Group Name', 'Area', 'PDF', 'Native File', 'Target Folder']]
+          .concat(cRows.map((r, i) => [i + 1, r.doc, r.rev, r.title, r.disc || '', r.groupCode || '', r.groupName || '',
+            areaOf(r.doc, r.groupCode), 'Y', r.fileHref ? String(r.fileExt || 'zip').toUpperCase() : '',
+            targetPath(r.doc, r.groupCode, r.groupName).join('\\')])),
+        [6, 26, 6, 46, 11, 12, 30, 10, 5, 11, 34]), 'ConZoL');
+
+      XLSX.utils.book_append_sheet(wb, mkSheet(
+        [['S/N', 'Document No.', 'Title', 'ConZoL Rev', 'Folder Rev', 'Folder', 'Result']]
+          .concat(cmp.map((r, i) => [i + 1, r.doc, r.title, r.crev, r.frev, r.folder, r.result])),
+        [6, 26, 46, 11, 11, 34, 30]), 'Compare');
+
+      const d = new Date();
+      const stamp = d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0');
+      const name = `ConZoL_document_list_${stamp}.xlsx`;
+      const blob = new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })],
+        { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      if (rootDir && await ensurePermission()) { await writeInto(rootDir, name, blob); log('· Saved ' + name + ' into the folder', 'ok'); }
+      else browserDownload(name, blob);
+
+      const need = cmp.filter((r) => /to download/.test(r.result)).length;
+      statusEl.textContent = `List built: folder ${fRows.length} files · ConZoL ${cRows.length} documents · missing ${need}`;
+      log('— List finished —');
+    } catch (e) {
+      log('· Could not build the list: ' + e.message, 'er');
+      statusEl.textContent = 'Could not build the list';
+    }
+    showDirInfo();
+    running = false;
+  }
+  el('edl-list').onclick = () => makeLists();
 })();

@@ -30,8 +30,9 @@ def to_ext(src):
   }
 """
     src = src.replace("  const $ = (t, p) => Object.assign", loader + "\n  const $ = (t, p) => Object.assign", 1)
-    src = src.replace("        if (typeof XLSX === 'undefined') throw new Error('โหลดไลบรารีอ่าน .xlsx ไม่ได้');",
-                      "        await ensureXLSX();")
+    # แทนที่เฉพาะตัวคำสั่ง ไม่ยุ่งกับย่อหน้า — จะได้ใช้ได้ทุกที่ที่เรียก
+    src = src.replace("if (typeof XLSX === 'undefined') throw new Error('โหลดไลบรารีอ่าน .xlsx ไม่ได้');",
+                      "await ensureXLSX();")
     return src
 
 # ---------- ไทย ----------
