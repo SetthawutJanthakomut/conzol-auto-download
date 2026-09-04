@@ -17,8 +17,22 @@ Available in **English** and **ไทย** — same features, same version, buil
 
 ### With Tampermonkey — recommended, updates itself
 
-1. Install [Tampermonkey](https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo)
-2. Click the version you want, then press **Install**
+**1. Install [Tampermonkey](https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo)**
+
+**2. Turn on *Allow User Scripts*** — required, and easy to miss
+
+Chrome will not run any userscript until this is enabled. Open
+
+```
+chrome://extensions/?id=dhdgffkkebhmkfjojejmpbldmpobfkfo
+```
+
+and switch **Allow User Scripts** on. If the switch is not there, turn on
+**Developer mode** (top right of `chrome://extensions`) first and it will appear.
+
+Skip this and the script installs fine but the panel never shows up.
+
+**3. Click the version you want, then press *Install***
 
 | Language | Install link |
 |---|---|
@@ -121,8 +135,22 @@ ConZoL ให้มาแค่ `GMTP-1400-MA-DWG-401-T3.pdf`
 
 ### ผ่าน Tampermonkey — แนะนำ อัปเดตให้เอง
 
-1. ติดตั้ง [Tampermonkey](https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo)
-2. กดลิงก์ภาษาที่ต้องการ แล้วกด **Install**
+**1. ติดตั้ง [Tampermonkey](https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo)**
+
+**2. เปิด *Allow User Scripts*** — ข้อนี้ห้ามข้าม คนลืมกันบ่อย
+
+Chrome จะไม่ยอมรันสคริปต์เลยถ้าไม่เปิดข้อนี้ วางลิงก์นี้ในช่อง URL
+
+```
+chrome://extensions/?id=dhdgffkkebhmkfjojejmpbldmpobfkfo
+```
+
+แล้วเปิดสวิตช์ **Allow User Scripts** ถ้าไม่เห็นสวิตช์ ให้เปิด
+**Developer mode** (มุมขวาบนของหน้า `chrome://extensions`) ก่อน แล้วมันจะโผล่มา
+
+ถ้าข้ามข้อนี้ สคริปต์จะติดตั้งสำเร็จ แต่กล่องจะไม่ขึ้นบนหน้า ConZoL
+
+**3. กดลิงก์ภาษาที่ต้องการ แล้วกด *Install***
 
 | ภาษา | ลิงก์ติดตั้ง |
 |---|---|
@@ -197,3 +225,36 @@ build.py  i18n-en.json  build.sh  ตัว build ทั้งสองภาษ
 bash build.sh          # build ใหม่ทั้ง 4 ไฟล์ ถ้าแปลตกจะฟ้อง error
 git add -A && git commit -m "..." && git push
 ```
+
+
+---
+
+## Troubleshooting / ปัญหาที่พบบ่อย
+
+**No panel on the ConZoL page / ไม่เห็นกล่องบนหน้า ConZoL**
+
+1. *Allow User Scripts* is off — the most common cause. See install step 2.
+   → เปิด *Allow User Scripts* ตามขั้นตอนที่ 2
+2. You are not on `drawing.asp`, or not logged in.
+   → ต้องอยู่หน้า `drawing.asp` และล็อกอินแล้ว
+3. Press F5.
+
+**Buttons do nothing / กดปุ่มแล้วไม่มีอะไรเกิดขึ้น**
+
+Two copies are installed. Check with F12 → Console:
+
+```js
+document.querySelectorAll('#edmsdl').length
+```
+
+More than 1 means a duplicate — keep one language, and do not run the
+userscript and the extension together.
+→ ได้มากกว่า 1 แปลว่าลงซ้ำ ให้เหลือภาษาเดียว และอย่าใช้ userscript คู่กับ extension
+
+**Choose folder does nothing / กดเลือกโฟลเดอร์แล้วเงียบ**
+
+Usually the duplicate above. Otherwise check the panel's log line for the
+error name — `NotAllowedError` normally means an IT policy blocks websites
+from writing files.
+→ ส่วนใหญ่มาจากการลงซ้ำข้างบน ถ้าไม่ใช่ ให้ดูบรรทัด log ในกล่องว่าขึ้น error อะไร
+`NotAllowedError` มักแปลว่า policy ขององค์กรห้ามเว็บเขียนไฟล์ลงเครื่อง
