@@ -1,0 +1,490 @@
+[
+ [
+  "// กันกรณีติดตั้งซ้อนกัน (userscript + extension หรือสคริปต์ 2 ชุด)",
+  "// Guard against a double install (userscript + extension, or two scripts)"
+ ],
+ [
+  "// ถ้ามีกล่องอยู่แล้ว ให้ชุดที่มาทีหลังหยุดทำงาน ไม่งั้น id จะซ้ำและปุ่มจะกดไม่ติด",
+  "// If a panel already exists the later copy stops here - otherwise ids collide and buttons stop responding"
+ ],
+ [
+  "// ซิงก์อัตโนมัติจาก @version ตอน build",
+  "// kept in sync with @version at build time"
+ ],
+ [
+  "// ---------------- ตั้งค่าได้ตรงนี้ ----------------",
+  "// ---------------- Settings ----------------"
+ ],
+ [
+  "// เว้นระยะระหว่างไฟล์",
+  "// pause between files"
+ ],
+ [
+  "// เว้นระยะระหว่างการค้นหน้า",
+  "// pause between search pages"
+ ],
+ [
+  "// โฟลเดอร์ที่ห้ามแตะ — ไม่สแกน ไม่จัดใหม่ (เอกสารที่ถูกยกเลิกใน MDR อยู่ในนี้)",
+  "// Folders never touched - not scanned, not re-sorted (cancelled MDR documents live here)"
+ ],
+ [
+  "'_Deleted', '_Archive', '_เก็บ'",
+  "'_Deleted', '_Archive', '_Cancelled'"
+ ],
+ [
+  "// ชื่อกำกับเลขพื้นที่ — เพิ่มได้เรื่อย ๆ ตามที่รู้ (เลขที่ไม่มีในนี้จะใช้เลขเปล่า)",
+  "// Optional labels for area codes - add as you learn them (unlisted codes use the bare code)"
+ ],
+ [
+  "'โหลดไลบรารีไม่สำเร็จ'",
+  "'Spreadsheet library failed to load'"
+ ],
+ [
+  "'เข้าถึง cdnjs.cloudflare.com ไม่ได้'",
+  "'Cannot reach cdnjs.cloudflare.com'"
+ ],
+ [
+  "'หมดเวลารอไลบรารี'",
+  "'Timed out loading spreadsheet library'"
+ ],
+ [
+  "// ============ ชื่อไฟล์ / โฟลเดอร์ ============",
+  "// ============ File and folder names ============"
+ ],
+ [
+  "// ============ กลุ่มเอกสาร — เอาจาก ConZoL ล้วน ๆ ============",
+  "// ============ Document group - taken from ConZoL itself ============"
+ ],
+ [
+  "// หัวกลุ่มในผลค้นหาหน้าตาแบบนี้:  \"MA-CAL:MARINE Calculation\"",
+  "// Group header rows look like:  \"MA-CAL:MARINE Calculation\""
+ ],
+ [
+  "// เก็บไว้ใน localStorage เพื่อใช้ตอนจัดโฟลเดอร์ไฟล์ที่โหลดไปแล้ว",
+  "// Cached in localStorage so already-downloaded files can be sorted later"
+ ],
+ [
+  "// แยกเลขพื้นที่ออกจากเลขเอกสาร โดยอ้างจากรหัสกลุ่มที่ ConZoL บอก",
+  "// Derive the area code from the document number using ConZoL's group code"
+ ],
+ [
+  "group MA-RPT  -> area (ไม่มี)",
+  "group MA-RPT  -> no area"
+ ],
+ [
+  "// ============ IndexedDB — จำโฟลเดอร์ที่เลือกไว้ ============",
+  "// ============ IndexedDB - remember the chosen folder ============"
+ ],
+ [
+  "/* ลองวิธีสำรอง */",
+  "/* fall through to copy+delete */"
+ ],
+ [
+  "// ============ ดาวน์โหลด ============",
+  "// ============ Download ============"
+ ],
+ [
+  "'ไม่ได้ไฟล์ (session หมดอายุ?)'",
+  "'No file returned - ConZoL session may have expired'"
+ ],
+ [
+  "// ============ ค้นหาผ่าน fetch ============",
+  "// ============ Search via fetch ============"
+ ],
+ [
+  "// อ่านตารางผลค้นหา — เก็บทั้งหัวกลุ่มและแถวเอกสาร ตามลำดับที่ ConZoL จัดมา",
+  "// Read the result table - keep group headers and rows in ConZoL's own order"
+ ],
+ [
+  "// แถวหัวกลุ่ม: ช่องเดียว colspan กว้าง ข้อความ \"CODE:ชื่อกลุ่ม\"",
+  "// Group header row: single wide colspan cell, text \"CODE:Group name\""
+ ],
+ [
+  "// คอลัมน์ FILE+ : ไฟล์แนบต้นฉบับ (ปกติเป็น .ZIP)",
+  "// FILE+ column: the native attachment (normally a .ZIP)"
+ ],
+ [
+  "'ค้นหาไม่สำเร็จ HTTP '",
+  "'Search failed - HTTP '"
+ ],
+ [
+  "// ============ อ่านไฟล์ MDR ============",
+  "// ============ Read the MDR file ============"
+ ],
+ [
+  "<legend>โฟลเดอร์ปลายทาง</legend>",
+  "<legend>Destination folder</legend>"
+ ],
+ [
+  ">ยังไม่ได้เลือกโฟลเดอร์</div>",
+  ">No folder chosen yet</div>"
+ ],
+ [
+  ">เลือกโฟลเดอร์…</button>",
+  ">Choose folder…</button>"
+ ],
+ [
+  ">สแกนใหม่</button>",
+  ">Rescan</button>"
+ ],
+ [
+  ">จัดโฟลเดอร์ใหม่</button>",
+  ">Re-sort folders</button>"
+ ],
+ [
+  "<legend>1) จากหน้าผลค้นหาปัจจุบัน</legend>",
+  "<legend>1) From the current search results</legend>"
+ ],
+ [
+  "> เฉพาะแถวที่ติ๊ก checkbox</label>",
+  "> Only ticked rows</label>"
+ ],
+ [
+  ">โหลดจากหน้านี้</button>",
+  ">Download this page</button>"
+ ],
+ [
+  "<legend>2) จากไฟล์ MDR (อัตโนมัติ)</legend>",
+  "<legend>2) From an MDR file (automatic)</legend>"
+ ],
+ [
+  ">ชีต: <select",
+  ">Sheet: <select"
+ ],
+ [
+  ">— เลือกไฟล์ก่อน —</option>",
+  ">— choose a file first —</option>"
+ ],
+ [
+  ">ยังไม่ได้โหลดรายการ</div>",
+  ">No list loaded</div>"
+ ],
+ [
+  ">ไม่เอาเอกสารเหล่านี้:</div>",
+  ">Exclude these documents:</div>"
+ ],
+ [
+  "placeholder=\"เช่น GMTP-MA-RPT-012\"",
+  "placeholder=\"e.g. GMTP-MA-RPT-012\""
+ ],
+ [
+  ">ค้น ConZoL + โหลดทั้งหมด</button>",
+  ">Search ConZoL + download all</button>"
+ ],
+ [
+  "<legend>ชนิดไฟล์ที่จะโหลด</legend>",
+  "<legend>What to download</legend>"
+ ],
+ [
+  "> PDF (คอลัมน์ PDF+)</label>",
+  "> PDF (PDF+ column)</label>"
+ ],
+ [
+  "> ไฟล์แนบต้นฉบับ (คอลัมน์ FILE+ · .zip)</label>",
+  "> Native attachment (FILE+ column · .zip)</label>"
+ ],
+ [
+  "> ข้ามไฟล์ที่มีอยู่ในโฟลเดอร์แล้ว</label>",
+  "> Skip files already in the folder</label>"
+ ],
+ [
+  "> ย้าย Rev เก่าเข้า _Superseded</label>",
+  "> Move superseded revisions to _Superseded</label>"
+ ],
+ [
+  "> แยกโฟลเดอร์ย่อยตามพื้นที่ (1400 / 0500 / PCC …)</label>",
+  "> Sub-folder per area code (1400 / 0500 / PCC …)</label>"
+ ],
+ [
+  "> ค้นรวมเอกสารที่ไม่ Active</label>",
+  "> Include non-active documents in search</label>"
+ ],
+ [
+  ">หยุด</button>",
+  ">Stop</button>"
+ ],
+ [
+  ">บันทึกรายงาน CSV</button>",
+  ">Save CSV report</button>"
+ ],
+ [
+  ">พร้อมทำงาน</div>",
+  ">Ready</div>"
+ ],
+ [
+  "// ---- โฟลเดอร์ปลายทาง ----",
+  "// ---- destination folder ----"
+ ],
+ [
+  "'ยังไม่ได้เลือกโฟลเดอร์ (จะเซฟลง Downloads แทน)'",
+  "'No folder chosen - files will go to Downloads'"
+ ],
+ [
+  "'เบราว์เซอร์นี้ไม่รองรับ — จะเซฟลง Downloads'",
+  "'Browser not supported - files will go to Downloads'"
+ ],
+ [
+  "· มีไฟล์อยู่แล้ว ${n}",
+  "· ${n} file(s) already here"
+ ],
+ [
+  "`· ใช้โฟลเดอร์ \"${handle.name}\" — สแกนเจอไฟล์เดิม ${[...existing.values()].reduce((a, b) => a + b.length, 0)}`",
+  "`· Using folder \"${handle.name}\" - found ${[...existing.values()].reduce((a, b) => a + b.length, 0)} existing file(s)`"
+ ],
+ [
+  "'เบราว์เซอร์นี้ไม่รองรับการเลือกโฟลเดอร์ ใช้ Chrome/Edge เวอร์ชันใหม่'",
+  "'This browser cannot pick a folder - use a recent Chrome or Edge'"
+ ],
+ [
+  "'เลือกโฟลเดอร์ไม่สำเร็จ: '",
+  "'Could not open that folder: '"
+ ],
+ [
+  "'· สแกนโฟลเดอร์ใหม่แล้ว'",
+  "'· Folder rescanned'"
+ ],
+ [
+  "// ---- จัดโฟลเดอร์ใหม่ทั้งหมดตามผังปัจจุบัน ----",
+  "// ---- re-sort every file into its current target folder ----"
+ ],
+ [
+  "'· เลือกโฟลเดอร์ปลายทางก่อน'",
+  "'· Choose a destination folder first'"
+ ],
+ [
+  "'· ไม่ได้รับสิทธิ์เขียนโฟลเดอร์'",
+  "'· Write permission denied'"
+ ],
+ [
+  "'กำลังสแกนโฟลเดอร์…'",
+  "'Scanning folder…'"
+ ],
+ [
+  "// หากลุ่มของเอกสารที่ยังไม่รู้ — ถาม ConZoL ทีละตัว",
+  "// Resolve unknown document groups - ask ConZoL one by one"
+ ],
+ [
+  "`ถาม ConZoL หากลุ่มของ ${unknown.length} เอกสาร…`",
+  "`Asking ConZoL for the group of ${unknown.length} document(s)…`"
+ ],
+ [
+  "→ ไม่พบใน ConZoL`",
+  "→ not found in ConZoL`"
+ ],
+ [
+  "${e.name === 'NotAllowedError' ? 'ไม่มีสิทธิ์' : e.message} (ไฟล์อาจเปิดค้างอยู่)",
+  "${e.name === 'NotAllowedError' ? 'permission denied' : e.message} (file may be open)"
+ ],
+ [
+  "`จัดเสร็จ: ย้าย ${moved} · เข้าที่แล้ว ${same} · _Superseded ${sup} · ผิดพลาด ${fail}`",
+  "`Sorted: moved ${moved} · already correct ${same} · superseded ${sup} · failed ${fail}`"
+ ],
+ [
+  "'— จบการจัดโฟลเดอร์ —'",
+  "'— Sorting finished —'"
+ ],
+ [
+  "// คืนค่าโฟลเดอร์ที่เคยเลือกไว้ (ต้องกดอนุญาตอีกครั้งตอนใช้งานจริง)",
+  "// Restore the previously chosen folder (permission confirmed again on first use)"
+ ],
+ [
+  "`· จำโฟลเดอร์ไว้: ${h.name}`",
+  "`· Remembered folder: ${h.name}`"
+ ],
+ [
+  "— กดปุ่มโหลดแล้วอนุญาตสิทธิ์อีกครั้ง`",
+  "— press a download button and allow access again`"
+ ],
+ [
+  "'กำลังหยุด…'",
+  "'Stopping…'"
+ ],
+ [
+  "// ---- เลือกไฟล์ MDR ----",
+  "// ---- MDR file picker ----"
+ ],
+ [
+  "`ใช้ ${mdrList.length} เลขเอกสาร`",
+  "`Using ${mdrList.length} document number(s)`"
+ ],
+ [
+  "` · ตัดที่ถูกลบใน MDR ${mdrExcluded}`",
+  "` · ${mdrExcluded} cancelled in MDR excluded`"
+ ],
+ [
+  "'<option value=\"*\">(ไฟล์ข้อความ)</option>'",
+  "'<option value=\"*\">(text file)</option>'"
+ ],
+ [
+  "'<option value=\"*\">— ทุกชีต —</option>'",
+  "'<option value=\"*\">— all sheets —</option>'"
+ ],
+ [
+  "`· อ่าน ${f.name}: ใช้ ${mdrList.length} รายการ`",
+  "`· Read ${f.name}: using ${mdrList.length} document(s)`"
+ ],
+ [
+  "` (ตัดที่ถูกลบ ${mdrExcluded})`",
+  "` (${mdrExcluded} cancelled excluded)`"
+ ],
+ [
+  "'อ่านไฟล์ไม่ได้: '",
+  "'Cannot read file: '"
+ ],
+ [
+  "// ---- รายงาน CSV ----",
+  "// ---- CSV report ----"
+ ],
+ [
+  "'· ยังไม่มีรายงาน'",
+  "'· No report yet - run a download first'"
+ ],
+ [
+  "'· บันทึก ' + name + ' ลงโฟลเดอร์แล้ว'",
+  "'· Saved ' + name + ' into the folder'"
+ ],
+ [
+  "// ============ ตัวรันดาวน์โหลด ============",
+  "// ============ Download runner ============"
+ ],
+ [
+  "'· ยังไม่ได้เลือกว่าจะโหลดอะไร — ติ๊ก PDF หรือ ไฟล์แนบ อย่างน้อยหนึ่งอย่าง'",
+  "'· Nothing selected - tick PDF and/or Native attachment first'"
+ ],
+ [
+  "'■ หยุดโดยผู้ใช้'",
+  "'■ Stopped by user'"
+ ],
+ [
+  "result: 'ไม่มีไฟล์ตามชนิดที่เลือก'",
+  "result: 'No file of the selected type'"
+ ],
+ [
+  "] ข้าม ${doc}-${r.rev} — ไม่มีไฟล์แนบ`",
+  "] skipped ${doc}-${r.rev} - no attachment`"
+ ],
+ [
+  "result: 'ข้าม (มีอยู่แล้ว)'",
+  "result: 'Skipped (already present)'"
+ ],
+ [
+  "] ข้าม ${name}`",
+  "] skipped ${name}`"
+ ],
+ [
+  "`กำลังโหลด ${i}/${items.length} …`",
+  "`Downloading ${i}/${items.length} …`"
+ ],
+ [
+  "result: 'สำเร็จ'",
+  "result: 'Downloaded'"
+ ],
+ [
+  "result: 'ผิดพลาด: '",
+  "result: 'Error: '"
+ ],
+ [
+  "'ไม่ได้รับสิทธิ์เขียนโฟลเดอร์ — จะเซฟลง Downloads แทน'",
+  "'Write permission denied - saving to Downloads instead'"
+ ],
+ [
+  "'⚠ ยังไม่ได้เลือกโฟลเดอร์ปลายทาง — ไฟล์จะลง Downloads และไม่แยกโฟลเดอร์'",
+  "'⚠ No destination folder chosen - files go to Downloads with no sorting'"
+ ],
+ [
+  "// ============ โหมด 1 ============",
+  "// ============ Mode 1 ============"
+ ],
+ [
+  "'ไม่พบเอกสารในหน้านี้'",
+  "'No documents on this page'"
+ ],
+ [
+  "'กด SEARCH ให้มีผลลัพธ์ก่อน'",
+  "'Run a SEARCH first so the list has results'"
+ ],
+ [
+  "`พบ ${rows.length} รายการในหน้านี้`",
+  "`Found ${rows.length} document(s) on this page`"
+ ],
+ [
+  "`เสร็จ: สำเร็จ ${s.ok} · ข้าม ${s.skipped} · ผิดพลาด ${s.fail}`",
+  "`Done: downloaded ${s.ok} · skipped ${s.skipped} · failed ${s.fail}`"
+ ],
+ [
+  "` · เก่า→_Superseded ${s.sup}`",
+  "` · superseded ${s.sup}`"
+ ],
+ [
+  "'— จบการทำงาน —'",
+  "'— Finished —'"
+ ],
+ [
+  "// ============ โหมด 2 ============",
+  "// ============ Mode 2 ============"
+ ],
+ [
+  "'· ยังไม่ได้เลือกไฟล์ MDR'",
+  "'· Choose an MDR file first'"
+ ],
+ [
+  "`MDR ${mdrList.length} รายการ · discipline: ",
+  "`MDR ${mdrList.length} document(s) · disciplines: "
+ ],
+ [
+  "`กำลังค้น ConZoL: ${disc} …`",
+  "`Searching ConZoL: ${disc} …`"
+ ],
+ [
+  "`  · ${disc} หน้า ${page}/${total} → ${rows.length}`",
+  "`  · ${disc} page ${page}/${total} → ${rows.length}`"
+ ],
+ [
+  "`ค้นเพิ่มทีละรายการ ${probe.length} ตัว…`",
+  "`Looking up ${probe.length} document(s) individually…`"
+ ],
+ [
+  "`จับคู่ได้ ${items.length} / ${wanted.size}`",
+  "`Matched ${items.length} of ${wanted.size}`"
+ ],
+ [
+  "`ไม่พบใน ConZoL ${notFound.length} รายการ:`",
+  "`Not found in ConZoL - ${notFound.length} document(s):`"
+ ],
+ [
+  "result: 'ไม่พบใน ConZoL'",
+  "result: 'Not found in ConZoL'"
+ ],
+ [
+  "`เสร็จ: สำเร็จ ${s.ok} · ข้าม ${s.skipped} · ผิดพลาด ${s.fail} · ไม่พบ ${notFound.length}`",
+  "`Done: downloaded ${s.ok} · skipped ${s.skipped} · failed ${s.fail} · not found ${notFound.length}`"
+ ],
+ [
+  "`ไม่มีรายการให้โหลด (ไม่พบ ${notFound.length})`",
+  "`Nothing to download (${notFound.length} not found)`"
+ ],
+ [
+  "'— จบการทำงาน — กด \"บันทึกรายงาน CSV\" เพื่อเก็บผล'",
+  "'— Finished — press \"Save CSV report\" to keep the results'"
+ ],
+ [
+  "// แยกตามนามสกุลก่อน — PDF กับไฟล์แนบเป็นไฟล์คนละชนิดของเอกสารเดียวกัน",
+  "// Group by extension first - the PDF and the attachment are two file types of"
+ ],
+ [
+  "// ไม่ใช่ Rev เก่าของกันและกัน ถ้าไม่แยกจะมีตัวหนึ่งโดนย้ายเข้า _Superseded",
+  "// the same document, not older revisions of each other. Without this split one"
+ ],
+ [
+  "// ไม่จำกัดนามสกุล — ConZoL ส่งไฟล์แนบมาเป็นอะไรก็ได้ (zip, dwg, dgn, msg, ...)",
+  "// No extension whitelist - ConZoL can hand back any attachment type (zip, dwg, dgn, msg, ...)"
+ ],
+ [
+  "// รับทุกไฟล์ที่ชื่อขึ้นต้นด้วยเลขเอกสาร ยกเว้นไฟล์ที่ยังโหลดไม่จบ",
+  "// Accept any file whose name starts with a document number, except part-downloads"
+ ],
+ [
+  "   // ต้องมีนามสกุล",
+  "   // must have an extension"
+ ]
+]

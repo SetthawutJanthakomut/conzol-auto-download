@@ -1,40 +1,28 @@
-// ==UserScript==
-// @name         GULF ConZoL - Auto Download + Rename + Sort
-// @namespace    gmtp.conzol
-// @version      4.4
-// @description  Download PDFs and native attachments from GULF ConZoL EDMS automatically - names each file and sorts it into the folder ConZoL assigns.
-// @match        https://edms.gulf.co.th/dms/drawing.asp*
-// @match        http://edms.gulf.co.th/dms/drawing.asp*
-// @updateURL    https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.user.js
-// @downloadURL  https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.user.js
-// @require      https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js
-// @run-at       document-idle
-// @grant        none
-// ==/UserScript==
+// ConZoL Auto Download - Chrome Extension build
 
 
 (function () {
   'use strict';
 
-  // Guard against a double install (userscript + extension, or two scripts)
-  // If a panel already exists the later copy stops here - otherwise ids collide and buttons stop responding
+  // กันกรณีติดตั้งซ้อนกัน (userscript + extension หรือสคริปต์ 2 ชุด)
+  // ถ้ามีกล่องอยู่แล้ว ให้ชุดที่มาทีหลังหยุดทำงาน ไม่งั้น id จะซ้ำและปุ่มจะกดไม่ติด
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '4.4';   // kept in sync with @version at build time
+  const VERSION = '4.4';   // ซิงก์อัตโนมัติจาก @version ตอน build
 
-  // ---------------- Settings ----------------
+  // ---------------- ตั้งค่าได้ตรงนี้ ----------------
   const CFG = {
-    delayMs: 500,          // pause between files
-    searchDelayMs: 400,    // pause between search pages
+    delayMs: 500,          // เว้นระยะระหว่างไฟล์
+    searchDelayMs: 400,    // เว้นระยะระหว่างการค้นหน้า
     retry: 1,
     maxNameLen: 180,
     supersededDir: '_Superseded',
     unsortedDir: '_Unsorted',
-    // Folders never touched - not scanned, not re-sorted (cancelled MDR documents live here)
-    ignoreDirs: ['_Deleted', '_Archive', '_Cancelled']
+    // โฟลเดอร์ที่ห้ามแตะ — ไม่สแกน ไม่จัดใหม่ (เอกสารที่ถูกยกเลิกใน MDR อยู่ในนี้)
+    ignoreDirs: ['_Deleted', '_Archive', '_เก็บ']
   };
 
-  // Optional labels for area codes - add as you learn them (unlisted codes use the bare code)
+  // ชื่อกำกับเลขพื้นที่ — เพิ่มได้เรื่อย ๆ ตามที่รู้ (เลขที่ไม่มีในนี้จะใช้เลขเปล่า)
   const AREA_LABELS = {
     '0500': '0500 Seawater Intake-Outfall',
     '1400': '1400 Berth 1'
@@ -50,10 +38,10 @@
     xlsxLoading = new Promise((res, rej) => {
       const s = document.createElement('script');
       s.src = XLSX_URL;
-      s.onload = () => (typeof window.XLSX !== 'undefined') ? res(window.XLSX) : rej(new Error('Spreadsheet library failed to load'));
-      s.onerror = () => rej(new Error('Cannot reach cdnjs.cloudflare.com'));
+      s.onload = () => (typeof window.XLSX !== 'undefined') ? res(window.XLSX) : rej(new Error('โหลดไลบรารีไม่สำเร็จ'));
+      s.onerror = () => rej(new Error('เข้าถึง cdnjs.cloudflare.com ไม่ได้'));
       document.head.appendChild(s);
-      setTimeout(() => rej(new Error('Timed out loading spreadsheet library')), 20000);
+      setTimeout(() => rej(new Error('หมดเวลารอไลบรารี')), 20000);
     });
     return xlsxLoading;
   }
@@ -68,11 +56,11 @@
   let rootDir = null;          // FileSystemDirectoryHandle
   let existing = new Map();    // DOCNO -> [{name, rev, rank, parent}]
 
-  // ============ File and folder names ============
+  // ============ ชื่อไฟล์ / โฟลเดอร์ ============
   const FN_RE  = /^(GMTP-[A-Z0-9\-]+?)-([TR])(\d+)_/i;
   const DOC_RE = /\bGMTP-[A-Z0-9]+(?:-[A-Z0-9]+)*-\d{3,4}\b/i;
-  // No extension whitelist - ConZoL can hand back any attachment type (zip, dwg, dgn, msg, ...)
-  // Accept any file whose name starts with a document number, except part-downloads
+  // ไม่จำกัดนามสกุล — ConZoL ส่งไฟล์แนบมาเป็นอะไรก็ได้ (zip, dwg, dgn, msg, ...)
+  // รับทุกไฟล์ที่ชื่อขึ้นต้นด้วยเลขเอกสาร ยกเว้นไฟล์ที่ยังโหลดไม่จบ
   const SKIP_EXT = /\.(tmp|crdownload|part|partial|download|!ut)$/i;
 
   function safeName(r, ext) {
@@ -85,9 +73,9 @@
   const sanitizeFolder = (s) => String(s).replace(/[\\/:*?"<>|\r\n\t]/g, '-')
     .replace(/\s+/g, ' ').replace(/[. ]+$/g, '').trim().slice(0, 100) || '_Unsorted';
 
-  // ============ Document group - taken from ConZoL itself ============
-  // Group header rows look like:  "MA-CAL:MARINE Calculation"
-  // Cached in localStorage so already-downloaded files can be sorted later
+  // ============ กลุ่มเอกสาร — เอาจาก ConZoL ล้วน ๆ ============
+  // หัวกลุ่มในผลค้นหาหน้าตาแบบนี้:  "MA-CAL:MARINE Calculation"
+  // เก็บไว้ใน localStorage เพื่อใช้ตอนจัดโฟลเดอร์ไฟล์ที่โหลดไปแล้ว
   const GC_KEY = 'edms_groupcache_v1';
   let groupCache = (() => {
     try { return JSON.parse(localStorage.getItem(GC_KEY) || '{}'); } catch (e) { return {}; }
@@ -98,10 +86,10 @@
     groupCache[doc.toUpperCase()] = { c: code, n: name };
   }
 
-  // Derive the area code from the document number using ConZoL's group code
+  // แยกเลขพื้นที่ออกจากเลขเอกสาร โดยอ้างจากรหัสกลุ่มที่ ConZoL บอก
   //   doc GMTP-1400-MA-DWG-401  group MA-DWG  -> area 1400
   //   doc GMTP-CAZ-COJ-MS-007   group COJ-MS  -> area CAZ
-  //   doc GMTP-MA-RPT-001       group MA-RPT  -> no area
+  //   doc GMTP-MA-RPT-001       group MA-RPT  -> area (ไม่มี)
   function areaOf(doc, groupCode) {
     if (!groupCode) return '';
     const toks = String(doc).toUpperCase().split('-');
@@ -125,7 +113,7 @@
 
   const revRank = (series, num) => (String(series).toUpperCase() === 'T' ? 1000 : 0) + parseInt(num, 10);
 
-  // ============ IndexedDB - remember the chosen folder ============
+  // ============ IndexedDB — จำโฟลเดอร์ที่เลือกไว้ ============
   function idb() {
     return new Promise((res, rej) => {
       const r = indexedDB.open('edms_autodl', 1);
@@ -166,7 +154,7 @@
         continue;
       }
       if (SKIP_EXT.test(entry.name)) continue;
-      if (entry.name.lastIndexOf('.') <= 0) continue;   // must have an extension
+      if (entry.name.lastIndexOf('.') <= 0) continue;   // ต้องมีนามสกุล
       const m = FN_RE.exec(entry.name);
       if (!m) continue;
       const doc = m[1].toUpperCase();
@@ -202,7 +190,7 @@
     const sup = await ensureDir([CFG.supersededDir]);
     try {
       if (item.handle.move) { await item.handle.move(sup, item.name); return true; }
-    } catch (e) { /* fall through to copy+delete */ }
+    } catch (e) { /* ลองวิธีสำรอง */ }
     try {
       const file = await item.handle.getFile();
       await writeInto(sup, item.name, file);
@@ -211,13 +199,13 @@
     } catch (e) { return false; }
   }
 
-  // ============ Download ============
+  // ============ ดาวน์โหลด ============
   async function fetchDoc(url) {
     const res = await fetch(url, { credentials: 'same-origin' });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const ct = (res.headers.get('content-type') || '').toLowerCase();
     const blob = await res.blob();
-    if (ct.includes('text/html') || blob.size < 1024) throw new Error('No file returned - ConZoL session may have expired');
+    if (ct.includes('text/html') || blob.size < 1024) throw new Error('ไม่ได้ไฟล์ (session หมดอายุ?)');
     return blob;
   }
 
@@ -229,8 +217,8 @@
     setTimeout(() => URL.revokeObjectURL(url), 60000);
   }
 
-  // ============ Search via fetch ============
-  // Read the result table - keep group headers and rows in ConZoL's own order
+  // ============ ค้นหาผ่าน fetch ============
+  // อ่านตารางผลค้นหา — เก็บทั้งหัวกลุ่มและแถวเอกสาร ตามลำดับที่ ConZoL จัดมา
   function parseRows(root) {
     const rows = [];
     let gCode = '', gName = '';
@@ -238,7 +226,7 @@
       const cells = tr.cells;
       if (!cells) continue;
 
-      // Group header row: single wide colspan cell, text "CODE:Group name"
+      // แถวหัวกลุ่ม: ช่องเดียว colspan กว้าง ข้อความ "CODE:ชื่อกลุ่ม"
       if (cells.length === 1 && (cells[0].colSpan || 1) > 1) {
         const t = String(cells[0].innerText || '').replace(/\s+/g, ' ').trim();
         const m = /^([A-Z0-9][A-Z0-9\-]{1,20})\s*:\s*(.{1,80})$/i.exec(t);
@@ -252,7 +240,7 @@
       const doc = String(cells[1].innerText || '').replace(/\s+/g, ' ').trim();
       if (!doc) continue;
       rememberGroup(doc, gCode, gName);
-      // FILE+ column: the native attachment (normally a .ZIP)
+      // คอลัมน์ FILE+ : ไฟล์แนบต้นฉบับ (ปกติเป็น .ZIP)
       const fa = cells[11] ? cells[11].querySelector('a[href*="type=c"]') : null;
       const fhref = fa ? fa.getAttribute('href') : '';
       const fext = fhref ? String((/[?&]ext=([^&]+)/i.exec(fhref) || [])[1] || 'zip').toLowerCase() : '';
@@ -284,7 +272,7 @@
       method: 'POST', credentials: 'same-origin',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body
     });
-    if (!res.ok) throw new Error('Search failed - HTTP ' + res.status);
+    if (!res.ok) throw new Error('ค้นหาไม่สำเร็จ HTTP ' + res.status);
     const d = new DOMParser().parseFromString(await res.text(), 'text/html');
     return { rows: parseRows(d), pages: [...d.querySelectorAll('select[name=page] option')].map((o) => o.value) };
   }
@@ -299,7 +287,7 @@
     return null;
   }
 
-  // ============ Read the MDR file ============
+  // ============ อ่านไฟล์ MDR ============
   function readWorkbook(wb, sheetName) {
     const keep = new Map(), dropped = new Set();
     const sheets = sheetName === '*' ? wb.SheetNames : [sheetName];
@@ -385,40 +373,40 @@
     <div class="hd"><span>⬇ ConZoL Auto Download v${VERSION}</span><span class="x" id="edl-min">–</span></div>
     <div class="bd" id="edl-body">
 
-      <fieldset><legend>Destination folder</legend>
-        <div id="edl-dirinfo" class="wn">No folder chosen yet</div>
-        <button class="pick" id="edl-pick">Choose folder…</button>
-        <button id="edl-rescan">Rescan</button>
-        <button id="edl-tidy">Re-sort folders</button>
+      <fieldset><legend>โฟลเดอร์ปลายทาง</legend>
+        <div id="edl-dirinfo" class="wn">ยังไม่ได้เลือกโฟลเดอร์</div>
+        <button class="pick" id="edl-pick">เลือกโฟลเดอร์…</button>
+        <button id="edl-rescan">สแกนใหม่</button>
+        <button id="edl-tidy">จัดโฟลเดอร์ใหม่</button>
       </fieldset>
 
-      <fieldset><legend>1) From the current search results</legend>
-        <label><input type="checkbox" id="edl-checked"> Only ticked rows</label>
-        <button class="go" id="edl-run">Download this page</button>
+      <fieldset><legend>1) จากหน้าผลค้นหาปัจจุบัน</legend>
+        <label><input type="checkbox" id="edl-checked"> เฉพาะแถวที่ติ๊ก checkbox</label>
+        <button class="go" id="edl-run">โหลดจากหน้านี้</button>
       </fieldset>
 
-      <fieldset><legend>2) From an MDR file (automatic)</legend>
+      <fieldset><legend>2) จากไฟล์ MDR (อัตโนมัติ)</legend>
         <input type="file" id="edl-file" accept=".xlsx,.xlsm,.csv,.txt">
-        <div style="margin-top:4px">Sheet: <select id="edl-sheet"><option value="*">— choose a file first —</option></select></div>
-        <div id="edl-mdrinfo" class="sk" style="margin-top:3px">No list loaded</div>
-        <div style="margin-top:4px">Exclude these documents:</div>
-        <textarea id="edl-exclude" rows="2" style="width:100%;font:10px Consolas,monospace" placeholder="e.g. GMTP-MA-RPT-012"></textarea>
-        <button class="go2" id="edl-runmdr">Search ConZoL + download all</button>
+        <div style="margin-top:4px">ชีต: <select id="edl-sheet"><option value="*">— เลือกไฟล์ก่อน —</option></select></div>
+        <div id="edl-mdrinfo" class="sk" style="margin-top:3px">ยังไม่ได้โหลดรายการ</div>
+        <div style="margin-top:4px">ไม่เอาเอกสารเหล่านี้:</div>
+        <textarea id="edl-exclude" rows="2" style="width:100%;font:10px Consolas,monospace" placeholder="เช่น GMTP-MA-RPT-012"></textarea>
+        <button class="go2" id="edl-runmdr">ค้น ConZoL + โหลดทั้งหมด</button>
       </fieldset>
 
-      <fieldset style="margin-top:2px"><legend>What to download</legend>
-        <label><input type="checkbox" id="edl-getpdf" checked> PDF (PDF+ column)</label>
-        <label><input type="checkbox" id="edl-getfile"> Native attachment (FILE+ column · .zip)</label>
+      <fieldset style="margin-top:2px"><legend>ชนิดไฟล์ที่จะโหลด</legend>
+        <label><input type="checkbox" id="edl-getpdf" checked> PDF (คอลัมน์ PDF+)</label>
+        <label><input type="checkbox" id="edl-getfile"> ไฟล์แนบต้นฉบับ (คอลัมน์ FILE+ · .zip)</label>
       </fieldset>
-      <label><input type="checkbox" id="edl-skip" checked> Skip files already in the folder</label>
-      <label><input type="checkbox" id="edl-sup" checked> Move superseded revisions to _Superseded</label>
-      <label><input type="checkbox" id="edl-area" checked> Sub-folder per area code (1400 / 0500 / PCC …)</label>
-      <label><input type="checkbox" id="edl-inactive"> Include non-active documents in search</label>
+      <label><input type="checkbox" id="edl-skip" checked> ข้ามไฟล์ที่มีอยู่ในโฟลเดอร์แล้ว</label>
+      <label><input type="checkbox" id="edl-sup" checked> ย้าย Rev เก่าเข้า _Superseded</label>
+      <label><input type="checkbox" id="edl-area" checked> แยกโฟลเดอร์ย่อยตามพื้นที่ (1400 / 0500 / PCC …)</label>
+      <label><input type="checkbox" id="edl-inactive"> ค้นรวมเอกสารที่ไม่ Active</label>
       <div>
-        <button class="stop" id="edl-stop">Stop</button>
-        <button id="edl-csv">Save CSV report</button>
+        <button class="stop" id="edl-stop">หยุด</button>
+        <button id="edl-csv">บันทึกรายงาน CSV</button>
       </div>
-      <div class="st" id="edl-status">Ready</div>
+      <div class="st" id="edl-status">พร้อมทำงาน</div>
       <div class="log" id="edl-log"></div>
     </div>`;
   document.body.appendChild(box);
@@ -446,49 +434,49 @@
     document.addEventListener('mouseup', () => { drag = false; });
   })();
 
-  // ---- destination folder ----
+  // ---- โฟลเดอร์ปลายทาง ----
   function showDirInfo(extra) {
     const d = el('edl-dirinfo');
     if (!rootDir) {
       d.className = 'wn';
-      d.textContent = FSA ? 'No folder chosen - files will go to Downloads'
-                          : 'Browser not supported - files will go to Downloads';
+      d.textContent = FSA ? 'ยังไม่ได้เลือกโฟลเดอร์ (จะเซฟลง Downloads แทน)'
+                          : 'เบราว์เซอร์นี้ไม่รองรับ — จะเซฟลง Downloads';
       return;
     }
     d.className = 'ok';
     let n = 0; existing.forEach((v) => { n += v.length; });
-    d.textContent = `📁 ${rootDir.name} · ${n} file(s) already here` + (extra ? ' · ' + extra : '');
+    d.textContent = `📁 ${rootDir.name} · มีไฟล์อยู่แล้ว ${n}` + (extra ? ' · ' + extra : '');
   }
 
   async function useDir(handle, quiet) {
     rootDir = handle;
     await refreshExisting();
     showDirInfo();
-    if (!quiet) log(`· Using folder "${handle.name}" - found ${[...existing.values()].reduce((a, b) => a + b.length, 0)} existing file(s)`, 'ok');
+    if (!quiet) log(`· ใช้โฟลเดอร์ "${handle.name}" — สแกนเจอไฟล์เดิม ${[...existing.values()].reduce((a, b) => a + b.length, 0)}`, 'ok');
   }
 
   el('edl-pick').onclick = async () => {
-    if (!FSA) { log('This browser cannot pick a folder - use a recent Chrome or Edge', 'er'); return; }
+    if (!FSA) { log('เบราว์เซอร์นี้ไม่รองรับการเลือกโฟลเดอร์ ใช้ Chrome/Edge เวอร์ชันใหม่', 'er'); return; }
     try {
       const h = await window.showDirectoryPicker({ mode: 'readwrite', id: 'edmsdl' });
       await idbPut('dir', h);
       await useDir(h);
-    } catch (e) { if (e.name !== 'AbortError') log('Could not open that folder: ' + e.message, 'er'); }
+    } catch (e) { if (e.name !== 'AbortError') log('เลือกโฟลเดอร์ไม่สำเร็จ: ' + e.message, 'er'); }
   };
 
   el('edl-rescan').onclick = async () => {
     if (!rootDir) return;
     await refreshExisting(); showDirInfo();
-    log('· Folder rescanned', 'sk');
+    log('· สแกนโฟลเดอร์ใหม่แล้ว', 'sk');
   };
 
-  // ---- re-sort every file into its current target folder ----
+  // ---- จัดโฟลเดอร์ใหม่ทั้งหมดตามผังปัจจุบัน ----
   async function moveTo(item, dirParts) {
     if ((item.path || []).join('\\') === dirParts.join('\\')) return 'same';
     const dir = await ensureDir(dirParts);
     try {
       if (item.handle.move) { await item.handle.move(dir, item.name); return 'moved'; }
-    } catch (e) { /* fall through to copy+delete */ }
+    } catch (e) { /* ลองวิธีสำรอง */ }
     const file = await item.handle.getFile();
     await writeInto(dir, item.name, file);
     await item.parent.removeEntry(item.name);
@@ -520,23 +508,23 @@
 
   el('edl-tidy').onclick = async () => {
     if (running) return;
-    if (!rootDir) { log('· Choose a destination folder first', 'er'); return; }
-    if (!(await ensurePermission())) { log('· Write permission denied', 'er'); return; }
+    if (!rootDir) { log('· เลือกโฟลเดอร์ปลายทางก่อน', 'er'); return; }
+    if (!(await ensurePermission())) { log('· ไม่ได้รับสิทธิ์เขียนโฟลเดอร์', 'er'); return; }
     running = true; logEl.innerHTML = ''; lastReport = [];
-    log('Scanning folder…');
+    log('กำลังสแกนโฟลเดอร์…');
     await refreshExisting();
 
-    // Resolve unknown document groups - ask ConZoL one by one
+    // หากลุ่มของเอกสารที่ยังไม่รู้ — ถาม ConZoL ทีละตัว
     const unknown = [...existing.keys()].filter((d) => !groupCache[d]);
     if (unknown.length) {
-      log(`Asking ConZoL for the group of ${unknown.length} document(s)…`);
+      log(`ถาม ConZoL หากลุ่มของ ${unknown.length} เอกสาร…`);
       for (const d of unknown) {
         if (stopFlag) break;
         try {
           const { rows } = await searchPage({ search: d, worktype: '', dstatus: '' });
           const hit = rows.find((r) => norm(r.doc) === norm(d));
           if (hit && hit.groupCode) log(`   ${d} → ${hit.groupCode} ${hit.groupName}`, 'sk');
-          else log(`   ${d} → not found in ConZoL`, 'wn');
+          else log(`   ${d} → ไม่พบใน ConZoL`, 'wn');
         } catch (e) { log(`   ${d} → ${e.message}`, 'er'); }
         await sleep(CFG.searchDelayMs);
       }
@@ -549,8 +537,8 @@
     for (const [doc, list] of [...existing.entries()]) {
       const parts = targetPath(doc, '', '');
 
-      // Group by extension first - the PDF and the attachment are two file types of
-      // the same document, not older revisions of each other. Without this split one
+      // แยกตามนามสกุลก่อน — PDF กับไฟล์แนบเป็นไฟล์คนละชนิดของเอกสารเดียวกัน
+      // ไม่ใช่ Rev เก่าของกันและกัน ถ้าไม่แยกจะมีตัวหนึ่งโดนย้ายเข้า _Superseded
       const byExt = new Map();
       for (const it of list) {
         const e = it.ext || 'pdf';
@@ -571,7 +559,7 @@
           } else same++;
         } catch (e) {
           fail++;
-          log(`✗ ${it.name} → ${e.name === 'NotAllowedError' ? 'permission denied' : e.message} (file may be open)`, 'er');
+          log(`✗ ${it.name} → ${e.name === 'NotAllowedError' ? 'ไม่มีสิทธิ์' : e.message} (ไฟล์อาจเปิดค้างอยู่)`, 'er');
         }
       }
       }
@@ -579,8 +567,8 @@
 
     try { await pruneEmpty(rootDir, []); } catch (e) {}
     await refreshExisting(); showDirInfo();
-    statusEl.textContent = `Sorted: moved ${moved} · already correct ${same} · superseded ${sup} · failed ${fail}`;
-    log('— Sorting finished —');
+    statusEl.textContent = `จัดเสร็จ: ย้าย ${moved} · เข้าที่แล้ว ${same} · _Superseded ${sup} · ผิดพลาด ${fail}`;
+    log('— จบการจัดโฟลเดอร์ —');
     running = false;
   };
 
@@ -591,7 +579,7 @@
     return (await rootDir.requestPermission(opt)) === 'granted';
   }
 
-  // Restore the previously chosen folder (permission confirmed again on first use)
+  // คืนค่าโฟลเดอร์ที่เคยเลือกไว้ (ต้องกดอนุญาตอีกครั้งตอนใช้งานจริง)
   (async () => {
     if (!FSA) { showDirInfo(); return; }
     try {
@@ -599,24 +587,24 @@
       if (!h) { showDirInfo(); return; }
       if ((await h.queryPermission({ mode: 'readwrite' })) === 'granted') {
         await useDir(h, true);
-        log(`· Remembered folder: ${h.name}`, 'ok');
+        log(`· จำโฟลเดอร์ไว้: ${h.name}`, 'ok');
       } else {
         rootDir = h;
         el('edl-dirinfo').className = 'wn';
-        el('edl-dirinfo').textContent = `📁 ${h.name} — press a download button and allow access again`;
+        el('edl-dirinfo').textContent = `📁 ${h.name} — กดปุ่มโหลดแล้วอนุญาตสิทธิ์อีกครั้ง`;
       }
     } catch (e) { showDirInfo(); }
   })();
 
-  el('edl-stop').onclick = () => { stopFlag = true; statusEl.textContent = 'Stopping…'; };
+  el('edl-stop').onclick = () => { stopFlag = true; statusEl.textContent = 'กำลังหยุด…'; };
 
-  // ---- MDR file picker ----
+  // ---- เลือกไฟล์ MDR ----
   let workbook = null;
   function showMdrInfo(fname) {
     const i = el('edl-mdrinfo');
     i.className = 'ok';
-    i.textContent = `Using ${mdrList.length} document number(s)` +
-      (mdrExcluded ? ` · ${mdrExcluded} cancelled in MDR excluded` : '') + (fname ? ` · ${fname}` : '');
+    i.textContent = `ใช้ ${mdrList.length} เลขเอกสาร` +
+      (mdrExcluded ? ` · ตัดที่ถูกลบใน MDR ${mdrExcluded}` : '') + (fname ? ` · ${fname}` : '');
   }
   const refreshMdr = () => {
     if (!workbook) return;
@@ -634,26 +622,26 @@
       if (/\.(csv|txt)$/i.test(f.name)) {
         workbook = null;
         mdrList = readTextList(await f.text());
-        el('edl-sheet').innerHTML = '<option value="*">(text file)</option>';
+        el('edl-sheet').innerHTML = '<option value="*">(ไฟล์ข้อความ)</option>';
       } else {
         await ensureXLSX();
         workbook = XLSX.read(await f.arrayBuffer(), { type: 'array', cellStyles: true });
-        el('edl-sheet').innerHTML = '<option value="*">— all sheets —</option>' +
+        el('edl-sheet').innerHTML = '<option value="*">— ทุกชีต —</option>' +
           workbook.SheetNames.map((n) => `<option value="${n.replace(/"/g, '&quot;')}">${n}</option>`).join('');
         mdrList = readWorkbook(workbook, '*');
       }
       mdrList = applyManualExclusions(mdrList);
       showMdrInfo(f.name);
-      log(`· Read ${f.name}: using ${mdrList.length} document(s)` + (mdrExcluded ? ` (${mdrExcluded} cancelled excluded)` : ''), 'ok');
+      log(`· อ่าน ${f.name}: ใช้ ${mdrList.length} รายการ` + (mdrExcluded ? ` (ตัดที่ถูกลบ ${mdrExcluded})` : ''), 'ok');
     } catch (e) {
       el('edl-mdrinfo').className = 'er';
-      el('edl-mdrinfo').textContent = 'Cannot read file: ' + e.message;
+      el('edl-mdrinfo').textContent = 'อ่านไฟล์ไม่ได้: ' + e.message;
     }
   };
 
-  // ---- CSV report ----
+  // ---- รายงาน CSV ----
   el('edl-csv').onclick = async () => {
-    if (!lastReport.length) { log('· No report yet - run a download first', 'sk'); return; }
+    if (!lastReport.length) { log('· ยังไม่มีรายงาน', 'sk'); return; }
     const esc = (s) => '"' + String(s == null ? '' : s).replace(/"/g, '""') + '"';
     const head = ['Document No.', 'Rev', 'Title', 'Result', 'File', 'Folder', 'Sheet'];
     const csv = '﻿' + [head, ...lastReport.map((r) => [r.doc, r.rev, r.title, r.result, r.file, r.folder || '', r.sheet || ''])]
@@ -662,11 +650,11 @@
     const stamp = d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0');
     const name = `ConZoL_download_report_${stamp}.csv`;
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-    if (rootDir && await ensurePermission()) { await writeInto(rootDir, name, blob); log('· Saved ' + name + ' into the folder', 'ok'); }
+    if (rootDir && await ensurePermission()) { await writeInto(rootDir, name, blob); log('· บันทึก ' + name + ' ลงโฟลเดอร์แล้ว', 'ok'); }
     else browserDownload(name, blob);
   };
 
-  // ============ Download runner ============
+  // ============ ตัวรันดาวน์โหลด ============
   async function runDownload(items) {
     let ok = 0, skipped = 0, fail = 0, sup = 0, i = 0;
     const skip = el('edl-skip').checked;
@@ -676,12 +664,12 @@
     const useFS = !!rootDir;
 
     if (!wantPdf && !wantFile) {
-      log('· Nothing selected - tick PDF and/or Native attachment first', 'er');
+      log('· ยังไม่ได้เลือกว่าจะโหลดอะไร — ติ๊ก PDF หรือ ไฟล์แนบ อย่างน้อยหนึ่งอย่าง', 'er');
       return { ok, skipped, fail, sup };
     }
 
     for (const r of items) {
-      if (stopFlag) { log('■ Stopped by user', 'er'); break; }
+      if (stopFlag) { log('■ หยุดโดยผู้ใช้', 'er'); break; }
       i++;
       const doc = r.doc.toUpperCase();
       const rm = /^([TR])(\d+)$/i.exec(r.rev);
@@ -696,8 +684,8 @@
 
       if (!kinds.length) {
         skipped++;
-        lastReport.push({ ...r, result: 'No file of the selected type', file: '', folder: '' });
-        log(`[${i}/${items.length}] skipped ${doc}-${r.rev} - no attachment`, 'sk');
+        lastReport.push({ ...r, result: 'ไม่มีไฟล์ตามชนิดที่เลือก', file: '', folder: '' });
+        log(`[${i}/${items.length}] ข้าม ${doc}-${r.rev} — ไม่มีไฟล์แนบ`, 'sk');
         continue;
       }
 
@@ -707,12 +695,12 @@
 
         if (skip && have.some((h) => h.rev === r.rev.toUpperCase() && (h.ext || 'pdf') === k.ext)) {
           skipped++;
-          lastReport.push({ ...r, result: 'Skipped (already present)', file: name, folder: '' });
-          log(`[${i}/${items.length}] skipped ${name}`, 'sk');
+          lastReport.push({ ...r, result: 'ข้าม (มีอยู่แล้ว)', file: name, folder: '' });
+          log(`[${i}/${items.length}] ข้าม ${name}`, 'sk');
           continue;
         }
 
-        statusEl.textContent = `Downloading ${i}/${items.length} …`;
+        statusEl.textContent = `กำลังโหลด ${i}/${items.length} …`;
         let done = false;
         for (let a = 0; a <= CFG.retry && !done; a++) {
           try {
@@ -738,12 +726,12 @@
               browserDownload(name, blob);
             }
             ok++; done = true;
-            lastReport.push({ ...r, result: 'Downloaded', file: name, folder: parts.join('\\') });
+            lastReport.push({ ...r, result: 'สำเร็จ', file: name, folder: parts.join('\\') });
             log(`[${i}/${items.length}] ✓ ${name} (${(blob.size / 1048576).toFixed(2)} MB)`, 'ok');
           } catch (e) {
             if (a === CFG.retry) {
               fail++;
-              lastReport.push({ ...r, result: 'Error: ' + e.message, file: name, folder: '' });
+              lastReport.push({ ...r, result: 'ผิดพลาด: ' + e.message, file: name, folder: '' });
               log(`[${i}/${items.length}] ✗ ${name} → ${e.message}`, 'er');
             } else await sleep(1200);
           }
@@ -756,14 +744,14 @@
 
   async function preflight() {
     if (rootDir) {
-      if (!(await ensurePermission())) { log('Write permission denied - saving to Downloads instead', 'wn'); rootDir = null; }
+      if (!(await ensurePermission())) { log('ไม่ได้รับสิทธิ์เขียนโฟลเดอร์ — จะเซฟลง Downloads แทน', 'wn'); rootDir = null; }
       else if (!existing.size) await refreshExisting();
     } else if (FSA) {
-      log('⚠ No destination folder chosen - files go to Downloads with no sorting', 'wn');
+      log('⚠ ยังไม่ได้เลือกโฟลเดอร์ปลายทาง — ไฟล์จะลง Downloads และไม่แยกโฟลเดอร์', 'wn');
     }
   }
 
-  // ============ Mode 1 ============
+  // ============ โหมด 1 ============
   el('edl-run').onclick = async () => {
     if (running) return;
     running = true; stopFlag = false; logEl.innerHTML = ''; lastReport = [];
@@ -771,20 +759,20 @@
     let rows = parseRows(document);
     if (el('edl-checked').checked) rows = rows.filter((r) => r.cb && r.cb.checked);
     if (!rows.length) {
-      statusEl.textContent = 'No documents on this page';
-      log('Run a SEARCH first so the list has results', 'er'); running = false; return;
+      statusEl.textContent = 'ไม่พบเอกสารในหน้านี้';
+      log('กด SEARCH ให้มีผลลัพธ์ก่อน', 'er'); running = false; return;
     }
-    log(`Found ${rows.length} document(s) on this page`);
+    log(`พบ ${rows.length} รายการในหน้านี้`);
     const s = await runDownload(rows.map((r) => ({ ...r, sheet: '' })));
-    statusEl.textContent = `Done: downloaded ${s.ok} · skipped ${s.skipped} · failed ${s.fail}` + (s.sup ? ` · superseded ${s.sup}` : '');
-    showDirInfo(); log('— Finished —');
+    statusEl.textContent = `เสร็จ: สำเร็จ ${s.ok} · ข้าม ${s.skipped} · ผิดพลาด ${s.fail}` + (s.sup ? ` · เก่า→_Superseded ${s.sup}` : '');
+    showDirInfo(); log('— จบการทำงาน —');
     running = false;
   };
 
-  // ============ Mode 2 ============
+  // ============ โหมด 2 ============
   el('edl-runmdr').onclick = async () => {
     if (running) return;
-    if (!mdrList.length) { log('· Choose an MDR file first', 'er'); return; }
+    if (!mdrList.length) { log('· ยังไม่ได้เลือกไฟล์ MDR', 'er'); return; }
     running = true; stopFlag = false; logEl.innerHTML = ''; lastReport = [];
     await preflight();
 
@@ -797,12 +785,12 @@
       const d = disciplineOf(m.doc, codes);
       if (d) { if (!byDisc.has(d)) byDisc.set(d, []); byDisc.get(d).push(m); } else noDisc.push(m);
     }
-    log(`MDR ${mdrList.length} document(s) · disciplines: ${[...byDisc.keys()].join(', ') || '-'}`);
+    log(`MDR ${mdrList.length} รายการ · discipline: ${[...byDisc.keys()].join(', ') || '-'}`);
 
     const index = new Map();
     for (const [disc] of byDisc) {
       if (stopFlag) break;
-      statusEl.textContent = `Searching ConZoL: ${disc} …`;
+      statusEl.textContent = `กำลังค้น ConZoL: ${disc} …`;
       let page = 1, total = 1;
       do {
         const extra = { worktype: disc, dstatus, page: String(page) };
@@ -810,14 +798,14 @@
         const { rows, pages } = await searchPage(extra);
         total = Math.max(pages.length || 1, total);
         rows.forEach((r) => { const k = norm(r.doc); if (!index.has(k)) index.set(k, r); });
-        log(`  · ${disc} page ${page}/${total} → ${rows.length}`, 'sk');
+        log(`  · ${disc} หน้า ${page}/${total} → ${rows.length}`, 'sk');
         page++; await sleep(CFG.searchDelayMs);
       } while (page <= total && !stopFlag);
     }
 
     const probe = [...wanted.keys()].filter((k) => !index.has(k));
     if (probe.length && !stopFlag) {
-      log(`Looking up ${probe.length} document(s) individually…`, 'wn');
+      log(`ค้นเพิ่มทีละรายการ ${probe.length} ตัว…`, 'wn');
       for (const k of probe) {
         if (stopFlag) break;
         try {
@@ -834,18 +822,18 @@
       const hit = index.get(k);
       if (hit) items.push({ ...hit, sheet: m.sheet || '' }); else notFound.push(m);
     }
-    log(`Matched ${items.length} of ${wanted.size}`, items.length ? 'ok' : 'er');
+    log(`จับคู่ได้ ${items.length} / ${wanted.size}`, items.length ? 'ok' : 'er');
     if (notFound.length) {
-      log(`Not found in ConZoL - ${notFound.length} document(s):`, 'wn');
+      log(`ไม่พบใน ConZoL ${notFound.length} รายการ:`, 'wn');
       notFound.forEach((m) => log('   – ' + m.doc, 'wn'));
-      notFound.forEach((m) => lastReport.push({ doc: m.doc, rev: '', title: m.title || '', result: 'Not found in ConZoL', file: '', folder: '', sheet: m.sheet || '' }));
+      notFound.forEach((m) => lastReport.push({ doc: m.doc, rev: '', title: m.title || '', result: 'ไม่พบใน ConZoL', file: '', folder: '', sheet: m.sheet || '' }));
     }
 
     if (items.length) {
       const s = await runDownload(items);
-      statusEl.textContent = `Done: downloaded ${s.ok} · skipped ${s.skipped} · failed ${s.fail} · not found ${notFound.length}` + (s.sup ? ` · superseded ${s.sup}` : '');
-    } else statusEl.textContent = `Nothing to download (${notFound.length} not found)`;
-    showDirInfo(); log('— Finished — press "Save CSV report" to keep the results');
+      statusEl.textContent = `เสร็จ: สำเร็จ ${s.ok} · ข้าม ${s.skipped} · ผิดพลาด ${s.fail} · ไม่พบ ${notFound.length}` + (s.sup ? ` · เก่า→_Superseded ${s.sup}` : '');
+    } else statusEl.textContent = `ไม่มีรายการให้โหลด (ไม่พบ ${notFound.length})`;
+    showDirInfo(); log('— จบการทำงาน — กด "บันทึกรายงาน CSV" เพื่อเก็บผล');
     running = false;
   };
 })();

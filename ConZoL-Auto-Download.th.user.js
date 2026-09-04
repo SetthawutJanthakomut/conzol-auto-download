@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GULF ConZoL – Auto Download + Rename + Sort (MDR)
 // @namespace    gmtp.marine.jay
-// @version      4.1
+// @version      4.4
 // @description  ดาวน์โหลด PDF และไฟล์แนบ (FILE+) จาก ConZoL ลงโฟลเดอร์ที่เลือกไว้โดยตรง (ไม่ผ่าน Download ของ Chrome) ตั้งชื่อ <DocNo>-<Rev>_<Title>.pdf แยกโฟลเดอร์ตามหมวด ย้าย Rev เก่าเข้า _Superseded และอ่านรายการจากไฟล์ MDR ให้เอง
 // @author       JAY
 // @match        https://edms.gulf.co.th/dms/drawing.asp*
@@ -15,6 +15,12 @@
 
 (function () {
   'use strict';
+
+  // กันกรณีติดตั้งซ้อนกัน (userscript + extension หรือสคริปต์ 2 ชุด)
+  // ถ้ามีกล่องอยู่แล้ว ให้ชุดที่มาทีหลังหยุดทำงาน ไม่งั้น id จะซ้ำและปุ่มจะกดไม่ติด
+  if (document.getElementById('edmsdl')) return;
+
+  const VERSION = '4.4';   // ซิงก์อัตโนมัติจาก @version ตอน build
 
   // ---------------- ตั้งค่าได้ตรงนี้ ----------------
   const CFG = {
@@ -48,7 +54,9 @@
   // ============ ชื่อไฟล์ / โฟลเดอร์ ============
   const FN_RE  = /^(GMTP-[A-Z0-9\-]+?)-([TR])(\d+)_/i;
   const DOC_RE = /\bGMTP-[A-Z0-9]+(?:-[A-Z0-9]+)*-\d{3,4}\b/i;
-  const KEEP_EXT = /\.(pdf|zip|rar|7z|dwg|dxf|docx?|xlsx?|pptx?)$/i;
+  // ไม่จำกัดนามสกุล — ConZoL ส่งไฟล์แนบมาเป็นอะไรก็ได้ (zip, dwg, dgn, msg, ...)
+  // รับทุกไฟล์ที่ชื่อขึ้นต้นด้วยเลขเอกสาร ยกเว้นไฟล์ที่ยังโหลดไม่จบ
+  const SKIP_EXT = /\.(tmp|crdownload|part|partial|download|!ut)$/i;
 
   function safeName(r, ext) {
     let base = r.doc + (r.rev ? '-' + r.rev : '') + (r.title ? '_' + r.title : '');
@@ -90,7 +98,7 @@
     const name = groupName || (g && g.n) || '';
     if (!code) return [CFG.unsortedDir];
     const parts = [sanitizeFolder(name ? code + ' ' + name : code)];
-    const cb = document.getElementById('edl-area');
+    const cb = el('edl-area');
     if (!cb || cb.checked) {
       const area = areaOf(doc, code);
       if (area) parts.push(sanitizeFolder(AREA_LABELS[area] || area));
@@ -140,7 +148,8 @@
         await scanFolder(entry, out, path.concat(entry.name));
         continue;
       }
-      if (!KEEP_EXT.test(entry.name)) continue;
+      if (SKIP_EXT.test(entry.name)) continue;
+      if (entry.name.lastIndexOf('.') <= 0) continue;   // ต้องมีนามสกุล
       const m = FN_RE.exec(entry.name);
       if (!m) continue;
       const doc = m[1].toUpperCase();
@@ -321,8 +330,8 @@
   }
 
   function applyManualExclusions(list) {
-    const box = document.getElementById('edl-exclude');
-    const txt = box ? box.value : '';
+    const ta = el('edl-exclude');
+    const txt = ta ? ta.value : '';
     if (!txt || !txt.trim()) return list;
     const ex = new Set(readTextList(txt).map((m) => norm(m.doc)));
     if (!ex.size) return list;
@@ -356,7 +365,7 @@
       #edmsdl .st{font-weight:bold;margin-top:5px}
       #edmsdl .x{cursor:pointer;font-weight:normal}
     </style>
-    <div class="hd"><span>⬇ ConZoL Auto Download v3</span><span class="x" id="edl-min">–</span></div>
+    <div class="hd"><span>⬇ ConZoL Auto Download v${VERSION}</span><span class="x" id="edl-min">–</span></div>
     <div class="bd" id="edl-body">
 
       <fieldset><legend>โฟลเดอร์ปลายทาง</legend>
@@ -397,7 +406,7 @@
     </div>`;
   document.body.appendChild(box);
 
-  const el = (id) => document.getElementById(id);
+  const el = (id) => box.querySelector('#' + id);
   const logEl = el('edl-log'), statusEl = el('edl-status');
   const log = (m, c) => { logEl.appendChild($('div', { className: c || '', textContent: m })); logEl.scrollTop = logEl.scrollHeight; };
 
@@ -521,8 +530,19 @@
     const doSup = el('edl-sup').checked;
 
     for (const [doc, list] of [...existing.entries()]) {
-      const sorted = [...list].sort((a, b) => b.rank - a.rank);
-      const parts = targetPath(doc, "", "");
+      const parts = targetPath(doc, '', '');
+
+      // แยกตามนามสกุลก่อน — PDF กับไฟล์แนบเป็นไฟล์คนละชนิดของเอกสารเดียวกัน
+      // ไม่ใช่ Rev เก่าของกันและกัน ถ้าไม่แยกจะมีตัวหนึ่งโดนย้ายเข้า _Superseded
+      const byExt = new Map();
+      for (const it of list) {
+        const e = it.ext || 'pdf';
+        if (!byExt.has(e)) byExt.set(e, []);
+        byExt.get(e).push(it);
+      }
+
+      for (const group of byExt.values()) {
+      const sorted = [...group].sort((a, b) => b.rank - a.rank);
       for (let i = 0; i < sorted.length; i++) {
         const it = sorted[i];
         const dest = (i === 0 || !doSup) ? parts : [CFG.supersededDir];
@@ -536,6 +556,7 @@
           fail++;
           log(`✗ ${it.name} → ${e.name === 'NotAllowedError' ? 'ไม่มีสิทธิ์' : e.message} (ไฟล์อาจเปิดค้างอยู่)`, 'er');
         }
+      }
       }
     }
 

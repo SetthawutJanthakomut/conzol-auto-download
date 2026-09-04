@@ -1,17 +1,3 @@
-// ==UserScript==
-// @name         GULF ConZoL - Auto Download + Rename + Sort
-// @namespace    gmtp.conzol
-// @version      4.4
-// @description  Download PDFs and native attachments from GULF ConZoL EDMS automatically - names each file and sorts it into the folder ConZoL assigns.
-// @match        https://edms.gulf.co.th/dms/drawing.asp*
-// @match        http://edms.gulf.co.th/dms/drawing.asp*
-// @updateURL    https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.user.js
-// @downloadURL  https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.user.js
-// @require      https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js
-// @run-at       document-idle
-// @grant        none
-// ==/UserScript==
-
 
 (function () {
   'use strict';
