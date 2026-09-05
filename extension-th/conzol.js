@@ -8,13 +8,14 @@
   // ถ้ามีกล่องอยู่แล้ว ให้ชุดที่มาทีหลังหยุดทำงาน ไม่งั้น id จะซ้ำและปุ่มจะกดไม่ติด
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '5.0';   // ซิงก์อัตโนมัติจาก @version ตอน build
+  const VERSION = '5.1';   // ซิงก์อัตโนมัติจาก @version ตอน build
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.th.user.js';   // build.py ใส่ให้ตามภาษา
 
   // ---------------- ตั้งค่าได้ตรงนี้ ----------------
   const CFG = {
     delayMs: 500,          // เว้นระยะระหว่างไฟล์
     searchDelayMs: 400,    // เว้นระยะระหว่างการค้นหน้า
+    histDelayMs: 250,      // เว้นระยะระหว่างการดึงประวัติ Rev ของแต่ละเอกสาร
     retry: 1,
     maxNameLen: 180,
     supersededDir: '_Superseded',
@@ -129,6 +130,18 @@
     vsNoRev: 'MDR has no revision yet',
     vsNoCz: '-'
   };
+
+  // ช่องของหนึ่ง Rev ที่ ConZoL เก็บไว้ (ตารางที่กางออกมาใต้เอกสาร)
+  const CZ_COLS = [
+    ['Rev',      (r) => r.rev,     7],
+    ['Status',   (r) => r.status,  7],
+    ['Iss.Date', (r) => r.iss,    10],
+    ['Tr.Date',  (r) => r.trd,    10],
+    ['TR No.',   (r) => r.no,     20],
+    ['Code',     (r) => r.code,    7],
+    ['R.Code',   (r) => r.rcode,   8],
+    ['R.Date',   (r) => r.rdate,  10]
+  ];
 
   // ช่องของหนึ่งรอบการส่ง เรียงเหมือน MDR — ใช้ทั้งชีต MDR (แนวนอน) และชีต Revisions (แนวตั้ง)
   const RND_COLS = [
@@ -311,6 +324,30 @@
     if (!res.ok) throw new Error('ค้นหาไม่สำเร็จ HTTP ' + res.status);
     const d = new DOMParser().parseFromString(await res.text(), 'text/html');
     return { rows: parseRows(d), pages: [...d.querySelectorAll('select[name=page] option')].map((o) => o.value) };
+  }
+
+  // ConZoL เก็บประวัติทุก Rev ไว้ที่ getdoc.asp — เป็นตารางเดียวกับที่กดกางออกมาในหน้าเว็บ
+  //   Rev · Status · Iss.Date · Tr.Date · NO.(Transmittal) · Code · R.Code · R.Date · R.Ref · Description · Comment File · FILE
+  // ช่อง FILE ของแต่ละแถวคือไฟล์ของ Rev นั้นเอง จึงโหลดย้อนหลังได้ทุก Rev ไม่ใช่แค่ตัวล่าสุด
+  async function fetchRevisions(fileid) {
+    const res = await fetch('getdoc.asp?did=' + fileid + '&rx=' + Math.random(), { credentials: 'same-origin' });
+    if (!res.ok) throw new Error('getdoc.asp HTTP ' + res.status);
+    const d = new DOMParser().parseFromString('<table>' + (await res.text()) + '</table>', 'text/html');
+    const out = [];
+    for (const tr of d.querySelectorAll('tr')) {
+      const c = tr.cells;
+      if (!c || c.length < 12) continue;          // แถวย่อยของไฟล์แนบมี 2 ช่อง ข้ามไป
+      const t = (i) => String(c[i].innerText || '').replace(/\s+/g, ' ').trim();
+      const rev = t(0);
+      if (!/^[A-Z]+\d+$/i.test(rev)) continue;    // แถวหัวตาราง
+      const fa = c[11].querySelector('a[href*="getfile.asp"]');
+      out.push({
+        rev: rev.toUpperCase(), status: t(1), iss: t(2), trd: t(3), no: t(4),
+        code: t(5), rcode: t(6), rdate: t(7), rref: t(8), desc: t(9),
+        href: fa ? fa.getAttribute('href') : ''
+      });
+    }
+    return out;
   }
 
   function disciplineCodes() {
@@ -573,6 +610,7 @@
 
       <fieldset><legend>3) ทำรายการเอกสารเป็น Excel</legend>
         <div>discipline: <input id="edl-listdisc" style="width:210px;font:10px Consolas,monospace" placeholder="เว้นว่าง = ทุกอย่าง · เช่น MA-DWG, MA-CAL"></div>
+        <label><input type="checkbox" id="edl-hist" checked> ดึงประวัติทุก Rev จาก ConZoL (TR No. · วันที่ · Status ทุกครั้งที่ส่ง)</label>
         <button class="chk" id="edl-list">สร้างไฟล์รายการ (.xlsx)</button>
       </fieldset>
 
@@ -1175,6 +1213,27 @@
       const cRows = await collectConzolRows(discList);
       log(`  พบเอกสาร ${cRows.length} รายการ`, cRows.length ? 'ok' : 'wn');
 
+      // ---- ประวัติทุก Rev จาก ConZoL ----
+      // เอกสารทั้งโปรเจกต์มีหลายพันรายการ ถ้าโหลด MDR ไว้จะดึงเฉพาะที่อยู่ใน MDR
+      const hist = new Map();
+      if (el('edl-hist').checked && cRows.length && !stopFlag) {
+        const inMdr = new Set(mdrList.map((m) => norm(m.doc)));
+        const want = mdrList.length ? cRows.filter((r) => inMdr.has(norm(r.doc))) : cRows;
+        log(`ดึงประวัติ Rev จาก ConZoL ${want.length} เอกสาร …`);
+        let n = 0, nrev = 0;
+        for (const r of want) {
+          if (stopFlag) break;
+          n++;
+          statusEl.textContent = `ดึงประวัติ Rev ${n}/${want.length} …`;
+          try {
+            const h = await fetchRevisions(r.fileid);
+            hist.set(norm(r.doc), h); nrev += h.length;
+          } catch (e) { log(`  ✗ ${r.doc} → ${e.message}`, 'er'); }
+          await sleep(CFG.histDelayMs);
+        }
+        log(`  ได้ประวัติ ${hist.size} เอกสาร รวม ${nrev} Rev`, hist.size ? 'ok' : 'wn');
+      }
+
       // ---- ชีต 3: เทียบกัน ----
       const byDocFolder = new Map();
       for (const r of fRows) {
@@ -1208,8 +1267,12 @@
       }
       cmp.sort((a, b) => a.doc.localeCompare(b.doc));
 
-      // ---- ชีต MDR: หน้าตาเหมือน MDR ของโปรเจกต์ — ทุกรอบการส่งอยู่บรรทัดเดียวกัน ----
+      // ---- ชีต MDR: หน้าตาเหมือน MDR ของโปรเจกต์ — ทุก Rev อยู่บรรทัดเดียวกัน ----
       const wb = XLSX.utils.book_new();
+      // จำนวน Rev มากสุดที่พบใน ConZoL — ใช้กำหนดจำนวนคอลัมน์ประวัติ
+      let maxRev = 0;
+      for (const h of hist.values()) if (h.length > maxRev) maxRev = h.length;
+
       if (mdrList.length) {
         const byK = new Map(cmp.map((r) => [norm(r.doc), r]));
         const BASE = ['S/N', 'Document No.', 'Title', 'Activity ID', 'Budget', 'Class',
@@ -1217,13 +1280,15 @@
                       'ConZoL Rev', 'MDR vs ConZoL', 'Result', 'MDR Sheet'];
         const BASE_W = [6, 26, 46, 13, 9, 7, 11, 17, 18, 9, 11, 28, 30, 18];
 
-        // หัวตาราง 2 บรรทัด: บรรทัดบน = ชื่อรอบ (รวมช่องเหมือน MDR) · บรรทัดล่าง = ชื่อช่อง
+        // หัวตาราง 2 บรรทัด: บรรทัดบน = ชื่อชุด (รวมช่องเหมือน MDR) · บรรทัดล่าง = ชื่อช่อง
         const h1 = BASE.map(() => ''), h2 = BASE.slice(), widths = BASE_W.slice(), merges = [];
-        mdrRoundHdr.forEach((name) => {
+        const addGroup = (name, cols) => {
           const at = h2.length;
-          RND_COLS.forEach((f, j) => { h1.push(j === 0 ? name : ''); h2.push(f[0]); widths.push(f[2]); });
-          merges.push({ s: { r: 0, c: at }, e: { r: 0, c: at + RND_COLS.length - 1 } });
-        });
+          cols.forEach((f, j) => { h1.push(j === 0 ? name : ''); h2.push(f[0]); widths.push(f[2]); });
+          merges.push({ s: { r: 0, c: at }, e: { r: 0, c: at + cols.length - 1 } });
+        };
+        for (let i = 0; i < maxRev; i++) addGroup('ConZoL - Revision ' + (i + 1), CZ_COLS);
+        mdrRoundHdr.forEach((name) => addGroup('MDR - ' + name, RND_COLS));
 
         const rows = mdrList.map((m, i) => {
           const c = byK.get(norm(m.doc));
@@ -1240,6 +1305,9 @@
           const line = [m.sn || (i + 1), m.doc, m.title || '', m.act || '', m.bud || '', m.cls || '',
                         m.rev || '', m.issue || '', m.reply || '', m.prg || '',
                         czRev, vs, c ? c.result : XL.noCz, m.sheet || ''];
+
+          const h = hist.get(norm(m.doc)) || [];
+          for (let k = 0; k < maxRev; k++) CZ_COLS.forEach((f) => line.push(h[k] ? (f[1](h[k]) || '') : ''));
           // ชีตที่หัวตารางไม่เหมือนกัน ปล่อยว่างไว้ ดีกว่าเอาค่าไปใส่ผิดช่อง
           const ok = m.rndKey === mdrRoundKey;
           mdrRoundHdr.forEach((name, k) => {
@@ -1250,24 +1318,28 @@
         });
 
         XLSX.utils.book_append_sheet(wb, mkSheet([h1, h2].concat(rows), widths, 1, merges), 'MDR');
-        log(`  ชีต MDR: ${rows.length} รายการ · ${mdrRoundHdr.length} รอบการส่ง (ตัดที่ยกเลิกออก ${mdrExcluded})`, 'ok');
+        log(`  ชีต MDR: ${rows.length} รายการ · ConZoL ${maxRev} Rev · MDR ${mdrRoundHdr.length} รอบการส่ง (ตัดที่ยกเลิกออก ${mdrExcluded})`, 'ok');
         if (mdrDropped.length) log('    ยกเลิกใน MDR: ' + mdrDropped.join(', '), 'sk');
-
-        // ---- ชีต Revisions: หนึ่งบรรทัดต่อหนึ่งรอบการส่ง ไว้เรียง/กรองตามวันที่ ----
-        const rv = [];
-        for (const m of mdrList) {
-          (m.rounds || []).forEach((r, k) => {
-            if (!(r.rev || r.sts || r.sent || r.reply)) return;
-            rv.push([m.sn || '', m.doc, m.title || '', mdrRoundHdr[k] || ('Issue ' + (k + 1))]
-              .concat(RND_COLS.map((f) => f[1](r) || '')).concat([m.sheet || '']));
-          });
-        }
-        XLSX.utils.book_append_sheet(wb, mkSheet(
-          [['S/N', 'Document No.', 'Title', 'Issue'].concat(RND_COLS.map((f) => f[0])).concat(['MDR Sheet'])].concat(rv),
-          [6, 26, 46, 42].concat(RND_COLS.map((f) => f[2])).concat([18])), 'Revisions');
-        log(`  ชีต Revisions: ${rv.length} รอบการส่ง`, 'ok');
       } else {
         log('· ยังไม่ได้เลือกไฟล์ MDR ในข้อ 2 — ข้ามชีต MDR', 'wn');
+      }
+
+      // ---- ชีต ConZoL Revisions: หนึ่งบรรทัดต่อหนึ่ง Rev ไว้เรียง/กรองตามวันที่หรือเลข TR ----
+      if (hist.size) {
+        const titleOf = new Map(cRows.map((r) => [norm(r.doc), r]));
+        const rv = [];
+        for (const [k, h] of hist) {
+          const r = titleOf.get(k);
+          h.forEach((x, j) => rv.push([rv.length + 1, r ? r.doc : k, r ? r.title : '', j + 1]
+            .concat(CZ_COLS.map((f) => f[1](x) || ''))
+            .concat([x.rref || '', x.desc || '',
+                     r ? targetPath(r.doc, r.groupCode, r.groupName).join('\\') : ''])));
+        }
+        XLSX.utils.book_append_sheet(wb, mkSheet(
+          [['S/N', 'Document No.', 'Title', 'No.'].concat(CZ_COLS.map((f) => f[0]))
+            .concat(['R.Ref', 'Description', 'Target Folder'])].concat(rv),
+          [6, 26, 46, 5].concat(CZ_COLS.map((f) => f[2])).concat([12, 30, 34])), 'ConZoL Revisions');
+        log(`  ชีต ConZoL Revisions: ${rv.length} Rev`, 'ok');
       }
 
       // ---- เขียนไฟล์ ----

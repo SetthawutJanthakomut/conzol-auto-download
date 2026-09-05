@@ -696,10 +696,6 @@
   "// The owner's Status column is the divider, so no group heading has to be matched"
  ],
  [
-  "`  ชีต Revisions: ${rv.length} รอบการส่ง`",
-  "`  Revisions sheet: ${rv.length} issue round(s)`"
- ],
- [
   "// ชื่อรอบการส่งใน MDR (1st Issue, 2nd Issue …)",
   "// Names of the MDR's issue rounds (1st Issue, 2nd Issue …)"
  ],
@@ -736,23 +732,79 @@
   "// hdrRow = the header row the filter sits on (0 = first row) · merges = merged header cells"
  ],
  [
-  "// ---- ชีต MDR: หน้าตาเหมือน MDR ของโปรเจกต์ — ทุกรอบการส่งอยู่บรรทัดเดียวกัน ----",
-  "// ---- Sheet MDR: laid out like the project MDR - every issue round on the same row ----"
- ],
- [
-  "// หัวตาราง 2 บรรทัด: บรรทัดบน = ชื่อรอบ (รวมช่องเหมือน MDR) · บรรทัดล่าง = ชื่อช่อง",
-  "// A two-row header: the top row names the round (merged, as in the MDR), the second names the field"
- ],
- [
   "// ชีตที่หัวตารางไม่เหมือนกัน ปล่อยว่างไว้ ดีกว่าเอาค่าไปใส่ผิดช่อง",
   "// A sheet with a different header is left blank rather than risk values landing in the wrong column"
  ],
  [
-  "`  ชีต MDR: ${rows.length} รายการ · ${mdrRoundHdr.length} รอบการส่ง (ตัดที่ยกเลิกออก ${mdrExcluded})`",
-  "`  MDR sheet: ${rows.length} rows · ${mdrRoundHdr.length} issue rounds (${mdrExcluded} cancelled row(s) left out)`"
+  "// เว้นระยะระหว่างการดึงประวัติ Rev ของแต่ละเอกสาร",
+  "// pause between fetching each document's revision history"
  ],
  [
-  "// ---- ชีต Revisions: หนึ่งบรรทัดต่อหนึ่งรอบการส่ง ไว้เรียง/กรองตามวันที่ ----",
-  "// ---- Sheet Revisions: one line per issue round, for sorting and filtering by date ----"
+  "// ช่องของหนึ่ง Rev ที่ ConZoL เก็บไว้ (ตารางที่กางออกมาใต้เอกสาร)",
+  "// The fields ConZoL keeps for one revision (the table that expands under a document)"
+ ],
+ [
+  "// ConZoL เก็บประวัติทุก Rev ไว้ที่ getdoc.asp — เป็นตารางเดียวกับที่กดกางออกมาในหน้าเว็บ",
+  "// ConZoL serves the full revision history from getdoc.asp - the same table the page expands"
+ ],
+ [
+  "// ช่อง FILE ของแต่ละแถวคือไฟล์ของ Rev นั้นเอง จึงโหลดย้อนหลังได้ทุก Rev ไม่ใช่แค่ตัวล่าสุด",
+  "// Each row's FILE cell is that revision's own file, so every revision can be fetched, not just the latest"
+ ],
+ [
+  "// แถวย่อยของไฟล์แนบมี 2 ช่อง ข้ามไป",
+  "// attachment sub-rows have 2 cells - skip them"
+ ],
+ [
+  "// แถวหัวตาราง",
+  "// the header row"
+ ],
+ [
+  "> ดึงประวัติทุก Rev จาก ConZoL (TR No. · วันที่ · Status ทุกครั้งที่ส่ง)</label>",
+  "> Fetch every revision from ConZoL (TR No. · dates · status of each submission)</label>"
+ ],
+ [
+  "// ---- ประวัติทุก Rev จาก ConZoL ----",
+  "// ---- Every revision, from ConZoL ----"
+ ],
+ [
+  "// เอกสารทั้งโปรเจกต์มีหลายพันรายการ ถ้าโหลด MDR ไว้จะดึงเฉพาะที่อยู่ใน MDR",
+  "// The project holds thousands of documents - with an MDR loaded, only its documents are fetched"
+ ],
+ [
+  "`ดึงประวัติ Rev จาก ConZoL ${want.length} เอกสาร …`",
+  "`Fetching revision history from ConZoL - ${want.length} documents …`"
+ ],
+ [
+  "`ดึงประวัติ Rev ${n}/${want.length} …`",
+  "`Revision history ${n}/${want.length} …`"
+ ],
+ [
+  "`  ได้ประวัติ ${hist.size} เอกสาร รวม ${nrev} Rev`",
+  "`  ${hist.size} documents · ${nrev} revisions`"
+ ],
+ [
+  "// ---- ชีต MDR: หน้าตาเหมือน MDR ของโปรเจกต์ — ทุก Rev อยู่บรรทัดเดียวกัน ----",
+  "// ---- Sheet MDR: laid out like the project MDR - every revision on the same row ----"
+ ],
+ [
+  "// จำนวน Rev มากสุดที่พบใน ConZoL — ใช้กำหนดจำนวนคอลัมน์ประวัติ",
+  "// The largest number of revisions found in ConZoL sets how many history columns are needed"
+ ],
+ [
+  "// หัวตาราง 2 บรรทัด: บรรทัดบน = ชื่อชุด (รวมช่องเหมือน MDR) · บรรทัดล่าง = ชื่อช่อง",
+  "// A two-row header: the top row names the group (merged, as in the MDR), the second names the field"
+ ],
+ [
+  "`  ชีต MDR: ${rows.length} รายการ · ConZoL ${maxRev} Rev · MDR ${mdrRoundHdr.length} รอบการส่ง (ตัดที่ยกเลิกออก ${mdrExcluded})`",
+  "`  MDR sheet: ${rows.length} rows · ConZoL ${maxRev} revisions · MDR ${mdrRoundHdr.length} rounds (${mdrExcluded} cancelled left out)`"
+ ],
+ [
+  "// ---- ชีต ConZoL Revisions: หนึ่งบรรทัดต่อหนึ่ง Rev ไว้เรียง/กรองตามวันที่หรือเลข TR ----",
+  "// ---- Sheet ConZoL Revisions: one line per revision, for sorting or filtering by date or TR No. ----"
+ ],
+ [
+  "`  ชีต ConZoL Revisions: ${rv.length} Rev`",
+  "`  ConZoL Revisions sheet: ${rv.length} revisions`"
  ]
 ]

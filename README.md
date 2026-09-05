@@ -73,7 +73,7 @@ plan in Excel before committing to it.
 | **ConZoL** | every document ConZoL holds for the disciplines you asked for — revision, title, group, area, whether a native attachment exists, and the folder it belongs in |
 | **Compare** | the two sides side by side — *Up to date*, *ConZoL is newer - to download*, *Not in the folder yet - to download*, *Not found in ConZoL* |
 | **MDR** | your own MDR, refreshed — only when an MDR file is loaded in step 2 |
-| **Revisions** | one line per issue round, for sorting or filtering by date |
+| **ConZoL Revisions** | one line per revision, straight from ConZoL — Rev, status, issue and transmittal dates, TR No., Code, reply code and date |
 
 The MDR sheet keeps the register's own columns (S/N, Document No., Title, Activity ID, Budget, Class,
 latest Rev., latest Issue Status, latest Owner's Reply, Progress), adds ConZoL's current revision,
@@ -82,6 +82,12 @@ latest Rev., latest Issue Status, latest Owner's Reply, Progress), adds ConZoL's
 exactly as the MDR lays them out: for each round *Issue Status · Rev. · Plan Start · Plan Finish ·
 Forecast · Submitted · TR No. · Owner's Reply · Reply Due · Reply Received · Reply TR No.*, under a merged
 heading naming the round (`For Construction / For Final - 2nd Issue`).
+
+ConZoL keeps its own revision history for every document — the table the web page expands under a
+document — and **Fetch every revision from ConZoL** pulls it from `getdoc.asp` and lays it out on the
+same row, ahead of the MDR's rounds: *Rev · Status · Iss.Date · Tr.Date · TR No. · Code · R.Code ·
+R.Date* per revision, under a merged `ConZoL - Revision n` heading. With an MDR loaded only its
+documents are fetched, so a 141-document register takes well under a minute.
 
 Everything is read from the header text, never from fixed column letters, so extra rounds, renamed
 sections or a reordered MDR all still read correctly. Rows struck through or marked *Delete* are left
@@ -220,7 +226,7 @@ chrome://extensions/?id=dhdgffkkebhmkfjojejmpbldmpobfkfo
 | **ConZoL** | เอกสารทุกตัวที่มีใน ConZoL ตาม discipline ที่เลือก — Rev, ชื่อเรื่อง, กลุ่ม, พื้นที่, มีไฟล์แนบไหม และโฟลเดอร์ที่ควรอยู่ |
 | **Compare** | เทียบสองฝั่ง — *Up to date*, *ConZoL ใหม่กว่า — ต้องโหลด*, *ยังไม่มีในโฟลเดอร์ — ต้องโหลด*, *ไม่พบใน ConZoL* |
 | **MDR** | MDR ของคุณเอง อัปเดตสถานะให้ — ขึ้นเฉพาะตอนโหลดไฟล์ MDR ในข้อ 2 แล้ว |
-| **Revisions** | หนึ่งบรรทัดต่อหนึ่งรอบการส่ง ไว้เรียงหรือกรองตามวันที่ |
+| **ConZoL Revisions** | หนึ่งบรรทัดต่อหนึ่ง Rev ดึงจาก ConZoL ตรง ๆ — Rev, Status, วันที่ออก/ส่ง, เลข TR, Code, R.Code, R.Date |
 
 ชีต MDR เก็บคอลัมน์เดิมของ MDR ไว้ (S/N, Document No., Title, Activity ID, Budget, Class, Rev. ล่าสุด,
 Issue Status ล่าสุด, Owner's Reply ล่าสุด, Progress) ต่อด้วย Rev ปัจจุบันใน ConZoL, **MDR vs ConZoL**
@@ -229,6 +235,11 @@ Issue Status ล่าสุด, Owner's Reply ล่าสุด, Progress) ต
 รอบละ *Issue Status · Rev. · Plan Start · Plan Finish · Forecast · Submitted · TR No. · Owner's Reply ·
 Reply Due · Reply Received · Reply TR No.* ใต้หัวตารางที่รวมช่องและบอกชื่อรอบ
 (`For Construction / For Final - 2nd Issue`)
+
+ConZoL เก็บประวัติทุก Rev ของแต่ละเอกสารไว้อยู่แล้ว (ตารางที่กดกางออกมาในหน้าเว็บ) ติ๊ก
+**ดึงประวัติทุก Rev จาก ConZoL** จะไปดึงจาก `getdoc.asp` มาวางในบรรทัดเดียวกัน ก่อนรอบการส่งของ MDR
+รอบละ *Rev · Status · Iss.Date · Tr.Date · TR No. · Code · R.Code · R.Date* ใต้หัวตาราง `ConZoL - Revision n`
+ถ้าโหลด MDR ไว้จะดึงเฉพาะเอกสารใน MDR — 141 รายการใช้เวลาไม่ถึงนาที
 
 ทุกอย่างอ่านจากข้อความหัวตาราง ไม่ผูกกับตัวอักษรคอลัมน์ เพิ่มรอบการส่ง เปลี่ยนชื่อหัวข้อ หรือสลับคอลัมน์
 ก็ยังอ่านได้ถูก แถวที่ขีดฆ่าหรือเขียน *Delete* จะถูกตัดออกและแจ้งเลขเอกสารไว้ในบันทึกการทำงาน

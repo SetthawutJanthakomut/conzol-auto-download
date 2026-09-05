@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GULF ConZoL - Auto Download + Rename + Sort
 // @namespace    gmtp.conzol
-// @version      5.0
+// @version      5.1
 // @description  Download PDFs and native attachments from GULF ConZoL EDMS automatically - names each file and sorts it into the folder ConZoL assigns.
 // @match        https://edms.gulf.co.th/dms/drawing.asp*
 // @match        http://edms.gulf.co.th/dms/drawing.asp*
@@ -20,13 +20,14 @@
   // If a panel already exists the later copy stops here - otherwise ids collide and buttons stop responding
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '5.0';   // kept in sync with @version at build time
+  const VERSION = '5.1';   // kept in sync with @version at build time
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.user.js';   // filled in per language at build time
 
   // ---------------- Settings ----------------
   const CFG = {
     delayMs: 500,          // pause between files
     searchDelayMs: 400,    // pause between search pages
+    histDelayMs: 250,      // pause between fetching each document's revision history
     retry: 1,
     maxNameLen: 180,
     supersededDir: '_Superseded',
@@ -141,6 +142,18 @@
     vsNoRev: 'MDR has no revision yet',
     vsNoCz: '-'
   };
+
+  // The fields ConZoL keeps for one revision (the table that expands under a document)
+  const CZ_COLS = [
+    ['Rev',      (r) => r.rev,     7],
+    ['Status',   (r) => r.status,  7],
+    ['Iss.Date', (r) => r.iss,    10],
+    ['Tr.Date',  (r) => r.trd,    10],
+    ['TR No.',   (r) => r.no,     20],
+    ['Code',     (r) => r.code,    7],
+    ['R.Code',   (r) => r.rcode,   8],
+    ['R.Date',   (r) => r.rdate,  10]
+  ];
 
   // The fields of one issue round, ordered as in the MDR - used by the MDR sheet (across) and Revisions (down)
   const RND_COLS = [
@@ -323,6 +336,30 @@
     if (!res.ok) throw new Error('Search failed - HTTP ' + res.status);
     const d = new DOMParser().parseFromString(await res.text(), 'text/html');
     return { rows: parseRows(d), pages: [...d.querySelectorAll('select[name=page] option')].map((o) => o.value) };
+  }
+
+  // ConZoL serves the full revision history from getdoc.asp - the same table the page expands
+  //   Rev · Status · Iss.Date · Tr.Date · NO.(Transmittal) · Code · R.Code · R.Date · R.Ref · Description · Comment File · FILE
+  // Each row's FILE cell is that revision's own file, so every revision can be fetched, not just the latest
+  async function fetchRevisions(fileid) {
+    const res = await fetch('getdoc.asp?did=' + fileid + '&rx=' + Math.random(), { credentials: 'same-origin' });
+    if (!res.ok) throw new Error('getdoc.asp HTTP ' + res.status);
+    const d = new DOMParser().parseFromString('<table>' + (await res.text()) + '</table>', 'text/html');
+    const out = [];
+    for (const tr of d.querySelectorAll('tr')) {
+      const c = tr.cells;
+      if (!c || c.length < 12) continue;          // attachment sub-rows have 2 cells - skip them
+      const t = (i) => String(c[i].innerText || '').replace(/\s+/g, ' ').trim();
+      const rev = t(0);
+      if (!/^[A-Z]+\d+$/i.test(rev)) continue;    // the header row
+      const fa = c[11].querySelector('a[href*="getfile.asp"]');
+      out.push({
+        rev: rev.toUpperCase(), status: t(1), iss: t(2), trd: t(3), no: t(4),
+        code: t(5), rcode: t(6), rdate: t(7), rref: t(8), desc: t(9),
+        href: fa ? fa.getAttribute('href') : ''
+      });
+    }
+    return out;
   }
 
   function disciplineCodes() {
@@ -585,6 +622,7 @@
 
       <fieldset><legend>3) Document list (Excel)</legend>
         <div>discipline: <input id="edl-listdisc" style="width:210px;font:10px Consolas,monospace" placeholder="blank = every discipline · e.g. MA-DWG, MA-CAL"></div>
+        <label><input type="checkbox" id="edl-hist" checked> Fetch every revision from ConZoL (TR No. · dates · status of each submission)</label>
         <button class="chk" id="edl-list">Build list (.xlsx)</button>
       </fieldset>
 
@@ -1187,6 +1225,27 @@
       const cRows = await collectConzolRows(discList);
       log(`  ${cRows.length} documents found`, cRows.length ? 'ok' : 'wn');
 
+      // ---- Every revision, from ConZoL ----
+      // The project holds thousands of documents - with an MDR loaded, only its documents are fetched
+      const hist = new Map();
+      if (el('edl-hist').checked && cRows.length && !stopFlag) {
+        const inMdr = new Set(mdrList.map((m) => norm(m.doc)));
+        const want = mdrList.length ? cRows.filter((r) => inMdr.has(norm(r.doc))) : cRows;
+        log(`Fetching revision history from ConZoL - ${want.length} documents …`);
+        let n = 0, nrev = 0;
+        for (const r of want) {
+          if (stopFlag) break;
+          n++;
+          statusEl.textContent = `Revision history ${n}/${want.length} …`;
+          try {
+            const h = await fetchRevisions(r.fileid);
+            hist.set(norm(r.doc), h); nrev += h.length;
+          } catch (e) { log(`  ✗ ${r.doc} → ${e.message}`, 'er'); }
+          await sleep(CFG.histDelayMs);
+        }
+        log(`  ${hist.size} documents · ${nrev} revisions`, hist.size ? 'ok' : 'wn');
+      }
+
       // ---- Sheet 3: the two sides compared ----
       const byDocFolder = new Map();
       for (const r of fRows) {
@@ -1220,8 +1279,12 @@
       }
       cmp.sort((a, b) => a.doc.localeCompare(b.doc));
 
-      // ---- Sheet MDR: laid out like the project MDR - every issue round on the same row ----
+      // ---- Sheet MDR: laid out like the project MDR - every revision on the same row ----
       const wb = XLSX.utils.book_new();
+      // The largest number of revisions found in ConZoL sets how many history columns are needed
+      let maxRev = 0;
+      for (const h of hist.values()) if (h.length > maxRev) maxRev = h.length;
+
       if (mdrList.length) {
         const byK = new Map(cmp.map((r) => [norm(r.doc), r]));
         const BASE = ['S/N', 'Document No.', 'Title', 'Activity ID', 'Budget', 'Class',
@@ -1229,13 +1292,15 @@
                       'ConZoL Rev', 'MDR vs ConZoL', 'Result', 'MDR Sheet'];
         const BASE_W = [6, 26, 46, 13, 9, 7, 11, 17, 18, 9, 11, 28, 30, 18];
 
-        // A two-row header: the top row names the round (merged, as in the MDR), the second names the field
+        // A two-row header: the top row names the group (merged, as in the MDR), the second names the field
         const h1 = BASE.map(() => ''), h2 = BASE.slice(), widths = BASE_W.slice(), merges = [];
-        mdrRoundHdr.forEach((name) => {
+        const addGroup = (name, cols) => {
           const at = h2.length;
-          RND_COLS.forEach((f, j) => { h1.push(j === 0 ? name : ''); h2.push(f[0]); widths.push(f[2]); });
-          merges.push({ s: { r: 0, c: at }, e: { r: 0, c: at + RND_COLS.length - 1 } });
-        });
+          cols.forEach((f, j) => { h1.push(j === 0 ? name : ''); h2.push(f[0]); widths.push(f[2]); });
+          merges.push({ s: { r: 0, c: at }, e: { r: 0, c: at + cols.length - 1 } });
+        };
+        for (let i = 0; i < maxRev; i++) addGroup('ConZoL - Revision ' + (i + 1), CZ_COLS);
+        mdrRoundHdr.forEach((name) => addGroup('MDR - ' + name, RND_COLS));
 
         const rows = mdrList.map((m, i) => {
           const c = byK.get(norm(m.doc));
@@ -1252,6 +1317,9 @@
           const line = [m.sn || (i + 1), m.doc, m.title || '', m.act || '', m.bud || '', m.cls || '',
                         m.rev || '', m.issue || '', m.reply || '', m.prg || '',
                         czRev, vs, c ? c.result : XL.noCz, m.sheet || ''];
+
+          const h = hist.get(norm(m.doc)) || [];
+          for (let k = 0; k < maxRev; k++) CZ_COLS.forEach((f) => line.push(h[k] ? (f[1](h[k]) || '') : ''));
           // A sheet with a different header is left blank rather than risk values landing in the wrong column
           const ok = m.rndKey === mdrRoundKey;
           mdrRoundHdr.forEach((name, k) => {
@@ -1262,24 +1330,28 @@
         });
 
         XLSX.utils.book_append_sheet(wb, mkSheet([h1, h2].concat(rows), widths, 1, merges), 'MDR');
-        log(`  MDR sheet: ${rows.length} rows · ${mdrRoundHdr.length} issue rounds (${mdrExcluded} cancelled row(s) left out)`, 'ok');
+        log(`  MDR sheet: ${rows.length} rows · ConZoL ${maxRev} revisions · MDR ${mdrRoundHdr.length} rounds (${mdrExcluded} cancelled left out)`, 'ok');
         if (mdrDropped.length) log('    cancelled in the MDR: ' + mdrDropped.join(', '), 'sk');
-
-        // ---- Sheet Revisions: one line per issue round, for sorting and filtering by date ----
-        const rv = [];
-        for (const m of mdrList) {
-          (m.rounds || []).forEach((r, k) => {
-            if (!(r.rev || r.sts || r.sent || r.reply)) return;
-            rv.push([m.sn || '', m.doc, m.title || '', mdrRoundHdr[k] || ('Issue ' + (k + 1))]
-              .concat(RND_COLS.map((f) => f[1](r) || '')).concat([m.sheet || '']));
-          });
-        }
-        XLSX.utils.book_append_sheet(wb, mkSheet(
-          [['S/N', 'Document No.', 'Title', 'Issue'].concat(RND_COLS.map((f) => f[0])).concat(['MDR Sheet'])].concat(rv),
-          [6, 26, 46, 42].concat(RND_COLS.map((f) => f[2])).concat([18])), 'Revisions');
-        log(`  Revisions sheet: ${rv.length} issue round(s)`, 'ok');
       } else {
         log('· No MDR file chosen in step 2 - the MDR sheet is skipped', 'wn');
+      }
+
+      // ---- Sheet ConZoL Revisions: one line per revision, for sorting or filtering by date or TR No. ----
+      if (hist.size) {
+        const titleOf = new Map(cRows.map((r) => [norm(r.doc), r]));
+        const rv = [];
+        for (const [k, h] of hist) {
+          const r = titleOf.get(k);
+          h.forEach((x, j) => rv.push([rv.length + 1, r ? r.doc : k, r ? r.title : '', j + 1]
+            .concat(CZ_COLS.map((f) => f[1](x) || ''))
+            .concat([x.rref || '', x.desc || '',
+                     r ? targetPath(r.doc, r.groupCode, r.groupName).join('\\') : ''])));
+        }
+        XLSX.utils.book_append_sheet(wb, mkSheet(
+          [['S/N', 'Document No.', 'Title', 'No.'].concat(CZ_COLS.map((f) => f[0]))
+            .concat(['R.Ref', 'Description', 'Target Folder'])].concat(rv),
+          [6, 26, 46, 5].concat(CZ_COLS.map((f) => f[2])).concat([12, 30, 34])), 'ConZoL Revisions');
+        log(`  ConZoL Revisions sheet: ${rv.length} revisions`, 'ok');
       }
 
       // ---- Write the workbook ----
