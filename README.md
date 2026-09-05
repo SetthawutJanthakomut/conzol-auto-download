@@ -84,9 +84,10 @@ Forecast · Submitted · TR No. · Owner's Reply · Reply Due · Reply Received 
 heading naming the round (`For Construction / For Final - 2nd Issue`).
 
 ConZoL keeps its own revision history for every document — the table the web page expands under a
-document — and **Fetch every revision from ConZoL** pulls it from `getdoc.asp` and lays it out on the
-same row, ahead of the MDR's rounds: *Rev · Status · Iss.Date · Tr.Date · TR No. · Code · R.Code ·
-R.Date* per revision, under a merged `ConZoL - Revision n` heading. With an MDR loaded only its
+document — and **Fetch every revision from ConZoL** pulls it from `getdoc.asp` into the **ConZoL
+Revisions** sheet, one line per revision: *Rev · Status · Iss.Date · Tr.Date · TR No. · Code · R.Code ·
+R.Date*. It stays separate from the MDR sheet, so each sheet has a single source: the MDR sheet is your
+register, the ConZoL Revisions sheet is what the system actually holds. With an MDR loaded only its
 documents are fetched, so a 141-document register takes well under a minute.
 
 Everything is read from the header text, never from fixed column letters, so extra rounds, renamed
@@ -237,8 +238,9 @@ Reply Due · Reply Received · Reply TR No.* ใต้หัวตาราง�
 (`For Construction / For Final - 2nd Issue`)
 
 ConZoL เก็บประวัติทุก Rev ของแต่ละเอกสารไว้อยู่แล้ว (ตารางที่กดกางออกมาในหน้าเว็บ) ติ๊ก
-**ดึงประวัติทุก Rev จาก ConZoL** จะไปดึงจาก `getdoc.asp` มาวางในบรรทัดเดียวกัน ก่อนรอบการส่งของ MDR
-รอบละ *Rev · Status · Iss.Date · Tr.Date · TR No. · Code · R.Code · R.Date* ใต้หัวตาราง `ConZoL - Revision n`
+**ดึงประวัติทุก Rev จาก ConZoL** จะไปดึงจาก `getdoc.asp` มาลงชีต **ConZoL Revisions** บรรทัดละ 1 Rev
+*Rev · Status · Iss.Date · Tr.Date · TR No. · Code · R.Code · R.Date* แยกจากชีต MDR คนละชีต
+แต่ละชีตจึงมีที่มาชุดเดียว — ชีต MDR คือทะเบียนของคุณ ชีต ConZoL Revisions คือของจริงในระบบ
 ถ้าโหลด MDR ไว้จะดึงเฉพาะเอกสารใน MDR — 141 รายการใช้เวลาไม่ถึงนาที
 
 ทุกอย่างอ่านจากข้อความหัวตาราง ไม่ผูกกับตัวอักษรคอลัมน์ เพิ่มรอบการส่ง เปลี่ยนชื่อหัวข้อ หรือสลับคอลัมน์

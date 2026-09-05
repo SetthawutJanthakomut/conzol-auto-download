@@ -8,7 +8,7 @@
   // ถ้ามีกล่องอยู่แล้ว ให้ชุดที่มาทีหลังหยุดทำงาน ไม่งั้น id จะซ้ำและปุ่มจะกดไม่ติด
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '5.1';   // ซิงก์อัตโนมัติจาก @version ตอน build
+  const VERSION = '5.2';   // ซิงก์อัตโนมัติจาก @version ตอน build
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.th.user.js';   // build.py ใส่ให้ตามภาษา
 
   // ---------------- ตั้งค่าได้ตรงนี้ ----------------
@@ -1269,10 +1269,6 @@
 
       // ---- ชีต MDR: หน้าตาเหมือน MDR ของโปรเจกต์ — ทุก Rev อยู่บรรทัดเดียวกัน ----
       const wb = XLSX.utils.book_new();
-      // จำนวน Rev มากสุดที่พบใน ConZoL — ใช้กำหนดจำนวนคอลัมน์ประวัติ
-      let maxRev = 0;
-      for (const h of hist.values()) if (h.length > maxRev) maxRev = h.length;
-
       if (mdrList.length) {
         const byK = new Map(cmp.map((r) => [norm(r.doc), r]));
         const BASE = ['S/N', 'Document No.', 'Title', 'Activity ID', 'Budget', 'Class',
@@ -1287,8 +1283,7 @@
           cols.forEach((f, j) => { h1.push(j === 0 ? name : ''); h2.push(f[0]); widths.push(f[2]); });
           merges.push({ s: { r: 0, c: at }, e: { r: 0, c: at + cols.length - 1 } });
         };
-        for (let i = 0; i < maxRev; i++) addGroup('ConZoL - Revision ' + (i + 1), CZ_COLS);
-        mdrRoundHdr.forEach((name) => addGroup('MDR - ' + name, RND_COLS));
+        mdrRoundHdr.forEach((name) => addGroup(name, RND_COLS));
 
         const rows = mdrList.map((m, i) => {
           const c = byK.get(norm(m.doc));
@@ -1306,8 +1301,6 @@
                         m.rev || '', m.issue || '', m.reply || '', m.prg || '',
                         czRev, vs, c ? c.result : XL.noCz, m.sheet || ''];
 
-          const h = hist.get(norm(m.doc)) || [];
-          for (let k = 0; k < maxRev; k++) CZ_COLS.forEach((f) => line.push(h[k] ? (f[1](h[k]) || '') : ''));
           // ชีตที่หัวตารางไม่เหมือนกัน ปล่อยว่างไว้ ดีกว่าเอาค่าไปใส่ผิดช่อง
           const ok = m.rndKey === mdrRoundKey;
           mdrRoundHdr.forEach((name, k) => {
@@ -1318,7 +1311,7 @@
         });
 
         XLSX.utils.book_append_sheet(wb, mkSheet([h1, h2].concat(rows), widths, 1, merges), 'MDR');
-        log(`  ชีต MDR: ${rows.length} รายการ · ConZoL ${maxRev} Rev · MDR ${mdrRoundHdr.length} รอบการส่ง (ตัดที่ยกเลิกออก ${mdrExcluded})`, 'ok');
+        log(`  ชีต MDR: ${rows.length} รายการ · ${mdrRoundHdr.length} รอบการส่ง (ตัดที่ยกเลิกออก ${mdrExcluded})`, 'ok');
         if (mdrDropped.length) log('    ยกเลิกใน MDR: ' + mdrDropped.join(', '), 'sk');
       } else {
         log('· ยังไม่ได้เลือกไฟล์ MDR ในข้อ 2 — ข้ามชีต MDR', 'wn');

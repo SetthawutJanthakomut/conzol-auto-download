@@ -788,16 +788,8 @@
   "// ---- Sheet MDR: laid out like the project MDR - every revision on the same row ----"
  ],
  [
-  "// จำนวน Rev มากสุดที่พบใน ConZoL — ใช้กำหนดจำนวนคอลัมน์ประวัติ",
-  "// The largest number of revisions found in ConZoL sets how many history columns are needed"
- ],
- [
   "// หัวตาราง 2 บรรทัด: บรรทัดบน = ชื่อชุด (รวมช่องเหมือน MDR) · บรรทัดล่าง = ชื่อช่อง",
   "// A two-row header: the top row names the group (merged, as in the MDR), the second names the field"
- ],
- [
-  "`  ชีต MDR: ${rows.length} รายการ · ConZoL ${maxRev} Rev · MDR ${mdrRoundHdr.length} รอบการส่ง (ตัดที่ยกเลิกออก ${mdrExcluded})`",
-  "`  MDR sheet: ${rows.length} rows · ConZoL ${maxRev} revisions · MDR ${mdrRoundHdr.length} rounds (${mdrExcluded} cancelled left out)`"
  ],
  [
   "// ---- ชีต ConZoL Revisions: หนึ่งบรรทัดต่อหนึ่ง Rev ไว้เรียง/กรองตามวันที่หรือเลข TR ----",
@@ -806,5 +798,9 @@
  [
   "`  ชีต ConZoL Revisions: ${rv.length} Rev`",
   "`  ConZoL Revisions sheet: ${rv.length} revisions`"
+ ],
+ [
+  "`  ชีต MDR: ${rows.length} รายการ · ${mdrRoundHdr.length} รอบการส่ง (ตัดที่ยกเลิกออก ${mdrExcluded})`",
+  "`  MDR sheet: ${rows.length} rows · ${mdrRoundHdr.length} issue rounds (${mdrExcluded} cancelled left out)`"
  ]
 ]

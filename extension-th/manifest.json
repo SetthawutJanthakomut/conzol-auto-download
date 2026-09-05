@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ConZoL Auto Download",
-  "version": "5.1",
+  "version": "5.2",
   "description": "ดาวน์โหลด PDF และไฟล์แนบจาก GULF ConZoL EDMS อัตโนมัติ ตั้งชื่อไฟล์และแยกโฟลเดอร์ตามกลุ่มเอกสารให้เอง",
   "content_scripts": [
     {
