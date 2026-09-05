@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GULF ConZoL - Auto Download + Rename + Sort
 // @namespace    gmtp.conzol
-// @version      5.2
+// @version      5.3
 // @description  Download PDFs and native attachments from GULF ConZoL EDMS automatically - names each file and sorts it into the folder ConZoL assigns.
 // @match        https://edms.gulf.co.th/dms/drawing.asp*
 // @match        http://edms.gulf.co.th/dms/drawing.asp*
@@ -20,7 +20,7 @@
   // If a panel already exists the later copy stops here - otherwise ids collide and buttons stop responding
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '5.2';   // kept in sync with @version at build time
+  const VERSION = '5.3';   // kept in sync with @version at build time
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.user.js';   // filled in per language at build time
 
   // ---------------- Settings ----------------
@@ -622,7 +622,12 @@
 
       <fieldset><legend>3) Document list (Excel)</legend>
         <div>discipline: <input id="edl-listdisc" style="width:210px;font:10px Consolas,monospace" placeholder="blank = every discipline · e.g. MA-DWG, MA-CAL"></div>
-        <label><input type="checkbox" id="edl-hist" checked> Fetch every revision from ConZoL (TR No. · dates · status of each submission)</label>
+        <div style="margin-top:5px">Which sheets:</div>
+        <label><input type="checkbox" id="edl-sh-mdr" checked> <b>MDR</b> - your register with its current status (needs the MDR file from step 2)</label>
+        <label><input type="checkbox" id="edl-sh-rev" checked> <b>ConZoL Revisions</b> - every revision from ConZoL · TR No. · dates · status</label>
+        <label><input type="checkbox" id="edl-sh-folder" checked> <b>Folder</b> - the files already in your folder</label>
+        <label><input type="checkbox" id="edl-sh-conzol" checked> <b>ConZoL</b> - every document in ConZoL (latest revision)</label>
+        <label><input type="checkbox" id="edl-sh-cmp" checked> <b>Compare</b> - your folder against ConZoL</label>
         <button class="chk" id="edl-list">Build list (.xlsx)</button>
       </fieldset>
 
@@ -1201,9 +1206,26 @@
     try {
       await ensureXLSX();
 
+      // Which sheets are wanted - only the work those sheets need is done
+      const SH = {
+        mdr:    el('edl-sh-mdr').checked,
+        rev:    el('edl-sh-rev').checked,
+        folder: el('edl-sh-folder').checked,
+        conzol: el('edl-sh-conzol').checked,
+        cmp:    el('edl-sh-cmp').checked
+      };
+      if (!Object.values(SH).some(Boolean)) throw new Error('No sheet is selected');
+      if (SH.mdr && !mdrList.length) log('· The MDR sheet is ticked but no MDR file is loaded in step 2', 'wn');
+      // The MDR and Compare sheets both use the comparison, so both need the folder and ConZoL
+      const needFolder = SH.folder || SH.cmp || SH.mdr;
+      const needConzol = SH.conzol || SH.cmp || SH.mdr || SH.rev;
+      log('Sheets to build: ' + Object.keys(SH).filter((k) => SH[k]).join(', '));
+
       // ---- Sheet 1: the files already in the folder ----
       let fRows = [];
-      if (rootDir && await ensurePermission()) {
+      if (!needFolder) {
+        log('· Skipping the folder scan - no selected sheet needs it', 'sk');
+      } else if (rootDir && await ensurePermission()) {
         statusEl.textContent = 'Reading the folder …';
         log('Reading the destination folder …');
         await refreshExisting();
@@ -1214,6 +1236,9 @@
       }
 
       // ---- Sheet 2: the documents in ConZoL ----
+      let cRows = [];
+      if (!needConzol) log('· Skipping the ConZoL search - no selected sheet needs it', 'sk');
+      else {
       const codes = disciplineCodes();
       const typed = String(el('edl-listdisc').value || '')
         .split(/[,\s]+/).map((s) => s.trim().toUpperCase()).filter(Boolean);
@@ -1222,13 +1247,14 @@
       const discList = typed.filter((d) => codes.has(d));
       if (!discList.length) discList.push(...[...codes].sort());
       log(`Searching ConZoL - ${discList.length} discipline(s): ${discList.join(', ')}`);
-      const cRows = await collectConzolRows(discList);
+      cRows = await collectConzolRows(discList);
       log(`  ${cRows.length} documents found`, cRows.length ? 'ok' : 'wn');
+      }
 
       // ---- Every revision, from ConZoL ----
       // The project holds thousands of documents - with an MDR loaded, only its documents are fetched
       const hist = new Map();
-      if (el('edl-hist').checked && cRows.length && !stopFlag) {
+      if (SH.rev && cRows.length && !stopFlag) {
         const inMdr = new Set(mdrList.map((m) => norm(m.doc)));
         const want = mdrList.length ? cRows.filter((r) => inMdr.has(norm(r.doc))) : cRows;
         log(`Fetching revision history from ConZoL - ${want.length} documents …`);
@@ -1281,7 +1307,7 @@
 
       // ---- Sheet MDR: laid out like the project MDR - every revision on the same row ----
       const wb = XLSX.utils.book_new();
-      if (mdrList.length) {
+      if (SH.mdr && mdrList.length) {
         const byK = new Map(cmp.map((r) => [norm(r.doc), r]));
         const BASE = ['S/N', 'Document No.', 'Title', 'Activity ID', 'Budget', 'Class',
                       'Latest Rev.', 'Latest Issue Status', "Latest Owner's Reply", 'Progress',
@@ -1325,12 +1351,10 @@
         XLSX.utils.book_append_sheet(wb, mkSheet([h1, h2].concat(rows), widths, 1, merges), 'MDR');
         log(`  MDR sheet: ${rows.length} rows · ${mdrRoundHdr.length} issue rounds (${mdrExcluded} cancelled left out)`, 'ok');
         if (mdrDropped.length) log('    cancelled in the MDR: ' + mdrDropped.join(', '), 'sk');
-      } else {
-        log('· No MDR file chosen in step 2 - the MDR sheet is skipped', 'wn');
       }
 
       // ---- Sheet ConZoL Revisions: one line per revision, for sorting or filtering by date or TR No. ----
-      if (hist.size) {
+      if (SH.rev && hist.size) {
         const titleOf = new Map(cRows.map((r) => [norm(r.doc), r]));
         const rv = [];
         for (const [k, h] of hist) {
@@ -1348,33 +1372,38 @@
       }
 
       // ---- Write the workbook ----
-      XLSX.utils.book_append_sheet(wb, mkSheet(
+      if (SH.folder) XLSX.utils.book_append_sheet(wb, mkSheet(
         [['S/N', 'Document No.', 'Rev', 'Title', 'File Name', 'Type', 'Folder', 'Status', 'Size (MB)', 'Modified']]
           .concat(fRows.map((r, i) => [i + 1, r.doc, r.rev, r.title, r.file, r.ext, r.folder, r.status, r.size, r.mtime])),
         [6, 26, 6, 46, 52, 7, 34, 12, 10, 12]), 'Folder');
 
-      XLSX.utils.book_append_sheet(wb, mkSheet(
+      if (SH.conzol) XLSX.utils.book_append_sheet(wb, mkSheet(
         [['S/N', 'Document No.', 'Rev', 'Title', 'Discipline', 'Group Code', 'Group Name', 'Area', 'PDF', 'Native File', 'Target Folder']]
           .concat(cRows.map((r, i) => [i + 1, r.doc, r.rev, r.title, r.disc || '', r.groupCode || '', r.groupName || '',
             areaOf(r.doc, r.groupCode), 'Y', r.fileHref ? String(r.fileExt || 'zip').toUpperCase() : '',
             targetPath(r.doc, r.groupCode, r.groupName).join('\\')])),
         [6, 26, 6, 46, 11, 12, 30, 10, 5, 11, 34]), 'ConZoL');
 
-      XLSX.utils.book_append_sheet(wb, mkSheet(
+      if (SH.cmp) XLSX.utils.book_append_sheet(wb, mkSheet(
         [['S/N', 'Document No.', 'Title', 'ConZoL Rev', 'Folder Rev', 'Folder', 'Result']]
           .concat(cmp.map((r, i) => [i + 1, r.doc, r.title, r.crev, r.frev, r.folder, r.result])),
         [6, 26, 46, 11, 11, 34, 30]), 'Compare');
 
+      if (!wb.SheetNames.length) throw new Error('None of the selected sheets has anything to write');
+
       const d = new Date();
       const stamp = d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0');
-      const name = `ConZoL_document_list_${stamp}.xlsx`;
+      // With a single sheet, put its name in the file name so it does not overwrite the full list
+      const tag = wb.SheetNames.length === 1 ? '_' + wb.SheetNames[0].replace(/\s+/g, '') : '';
+      const name = `ConZoL_document_list${tag}_${stamp}.xlsx`;
       const blob = new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })],
         { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       if (rootDir && await ensurePermission()) { await writeInto(rootDir, name, blob); log('· Saved ' + name + ' into the folder', 'ok'); }
       else browserDownload(name, blob);
 
       const need = cmp.filter((r) => /to download/.test(r.result)).length;
-      statusEl.textContent = `List built: folder ${fRows.length} files · ConZoL ${cRows.length} documents · missing ${need}`;
+      statusEl.textContent = `List built: ${wb.SheetNames.length} sheet(s) - ${wb.SheetNames.join(', ')}`
+        + (SH.cmp || SH.mdr ? ` · ${need} still to download` : '');
       log('— List finished —');
     } catch (e) {
       log('· Could not build the list: ' + e.message, 'er');

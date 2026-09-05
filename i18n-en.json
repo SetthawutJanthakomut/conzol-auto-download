@@ -624,10 +624,6 @@
   "// ---- Write the workbook ----"
  ],
  [
-  "`รายการเสร็จ: โฟลเดอร์ ${fRows.length} ไฟล์ · ConZoL ${cRows.length} รายการ · ยังไม่ครบ ${need}`",
-  "`List built: folder ${fRows.length} files · ConZoL ${cRows.length} documents · missing ${need}`"
- ],
- [
   "'— จบการทำรายการ —'",
   "'— List finished —'"
  ],
@@ -650,10 +646,6 @@
  [
   "// หาหัวตาราง แล้วคืนตำแหน่งคอลัมน์ของแต่ละหัวข้อ (rev/sts เก็บได้หลายช่อง)",
   "// Find the header row and return the column of each heading (rev/sts may repeat)"
- ],
- [
-  "'· ยังไม่ได้เลือกไฟล์ MDR ในข้อ 2 — ข้ามชีต MDR'",
-  "'· No MDR file chosen in step 2 - the MDR sheet is skipped'"
  ],
  [
   "// ช่อง Status ที่ติดกับ Rev. คือสถานะตอนส่งออก ที่เหลือคือผลตอบกลับของ Owner",
@@ -760,10 +752,6 @@
   "// the header row"
  ],
  [
-  "> ดึงประวัติทุก Rev จาก ConZoL (TR No. · วันที่ · Status ทุกครั้งที่ส่ง)</label>",
-  "> Fetch every revision from ConZoL (TR No. · dates · status of each submission)</label>"
- ],
- [
   "// ---- ประวัติทุก Rev จาก ConZoL ----",
   "// ---- Every revision, from ConZoL ----"
  ],
@@ -802,5 +790,73 @@
  [
   "`  ชีต MDR: ${rows.length} รายการ · ${mdrRoundHdr.length} รอบการส่ง (ตัดที่ยกเลิกออก ${mdrExcluded})`",
   "`  MDR sheet: ${rows.length} rows · ${mdrRoundHdr.length} issue rounds (${mdrExcluded} cancelled left out)`"
+ ],
+ [
+  ">เอาชีตไหนบ้าง:</div>",
+  ">Which sheets:</div>"
+ ],
+ [
+  " <b>MDR</b> — ทะเบียนของคุณ + สถานะล่าสุด (ต้องเลือกไฟล์ MDR ในข้อ 2)</label>",
+  " <b>MDR</b> - your register with its current status (needs the MDR file from step 2)</label>"
+ ],
+ [
+  " <b>ConZoL Revisions</b> — ทุก Rev จาก ConZoL · TR No. · วันที่ · Status</label>",
+  " <b>ConZoL Revisions</b> - every revision from ConZoL · TR No. · dates · status</label>"
+ ],
+ [
+  " <b>Folder</b> — ไฟล์ที่มีอยู่ในโฟลเดอร์</label>",
+  " <b>Folder</b> - the files already in your folder</label>"
+ ],
+ [
+  " <b>ConZoL</b> — เอกสารทั้งหมดใน ConZoL (Rev ล่าสุด)</label>",
+  " <b>ConZoL</b> - every document in ConZoL (latest revision)</label>"
+ ],
+ [
+  " <b>Compare</b> — เทียบโฟลเดอร์กับ ConZoL</label>",
+  " <b>Compare</b> - your folder against ConZoL</label>"
+ ],
+ [
+  "// เลือกชีตไหนไว้บ้าง — ทำเฉพาะงานที่ชีตนั้นต้องใช้ ไม่ต้องรอของที่ไม่ได้เอา",
+  "// Which sheets are wanted - only the work those sheets need is done"
+ ],
+ [
+  "'ยังไม่ได้เลือกชีตสักอัน'",
+  "'No sheet is selected'"
+ ],
+ [
+  "'· ติ๊กชีต MDR ไว้ แต่ยังไม่ได้เลือกไฟล์ MDR ในข้อ 2'",
+  "'· The MDR sheet is ticked but no MDR file is loaded in step 2'"
+ ],
+ [
+  "// ชีต MDR ใช้ผลเทียบ ชีต Compare ก็ใช้ — ทั้งคู่ต้องมีทั้งโฟลเดอร์และ ConZoL",
+  "// The MDR and Compare sheets both use the comparison, so both need the folder and ConZoL"
+ ],
+ [
+  "log('ชีตที่จะทำ: ' + Object.keys(SH).filter((k) => SH[k]).join(', '));",
+  "log('Sheets to build: ' + Object.keys(SH).filter((k) => SH[k]).join(', '));"
+ ],
+ [
+  "'· ข้ามการอ่านโฟลเดอร์ (ไม่ได้เลือกชีตที่ต้องใช้)'",
+  "'· Skipping the folder scan - no selected sheet needs it'"
+ ],
+ [
+  "'· ข้ามการค้น ConZoL (ไม่ได้เลือกชีตที่ต้องใช้)'",
+  "'· Skipping the ConZoL search - no selected sheet needs it'"
+ ],
+ [
+  "'ไม่มีชีตไหนมีข้อมูลให้เขียน'",
+  "'None of the selected sheets has anything to write'"
+ ],
+ [
+  "// ถ้าเอาชีตเดียว ใส่ชื่อชีตไว้ในชื่อไฟล์ จะได้ไม่ทับไฟล์เต็มที่ทำไว้ก่อนหน้า",
+  "// With a single sheet, put its name in the file name so it does not overwrite the full list"
+ ],
+ [
+  "`รายการเสร็จ: ${wb.SheetNames.length} ชีต (${wb.SheetNames.join(', ')})`",
+  "`List built: ${wb.SheetNames.length} sheet(s) - ${wb.SheetNames.join(', ')}`"
+ ],
+ [
+  "` · ยังไม่ครบ ${need}`",
+  "` · ${need} still to download`"
  ]
 ]

@@ -8,7 +8,7 @@
   // ถ้ามีกล่องอยู่แล้ว ให้ชุดที่มาทีหลังหยุดทำงาน ไม่งั้น id จะซ้ำและปุ่มจะกดไม่ติด
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '5.2';   // ซิงก์อัตโนมัติจาก @version ตอน build
+  const VERSION = '5.3';   // ซิงก์อัตโนมัติจาก @version ตอน build
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.th.user.js';   // build.py ใส่ให้ตามภาษา
 
   // ---------------- ตั้งค่าได้ตรงนี้ ----------------
@@ -610,7 +610,12 @@
 
       <fieldset><legend>3) ทำรายการเอกสารเป็น Excel</legend>
         <div>discipline: <input id="edl-listdisc" style="width:210px;font:10px Consolas,monospace" placeholder="เว้นว่าง = ทุกอย่าง · เช่น MA-DWG, MA-CAL"></div>
-        <label><input type="checkbox" id="edl-hist" checked> ดึงประวัติทุก Rev จาก ConZoL (TR No. · วันที่ · Status ทุกครั้งที่ส่ง)</label>
+        <div style="margin-top:5px">เอาชีตไหนบ้าง:</div>
+        <label><input type="checkbox" id="edl-sh-mdr" checked> <b>MDR</b> — ทะเบียนของคุณ + สถานะล่าสุด (ต้องเลือกไฟล์ MDR ในข้อ 2)</label>
+        <label><input type="checkbox" id="edl-sh-rev" checked> <b>ConZoL Revisions</b> — ทุก Rev จาก ConZoL · TR No. · วันที่ · Status</label>
+        <label><input type="checkbox" id="edl-sh-folder" checked> <b>Folder</b> — ไฟล์ที่มีอยู่ในโฟลเดอร์</label>
+        <label><input type="checkbox" id="edl-sh-conzol" checked> <b>ConZoL</b> — เอกสารทั้งหมดใน ConZoL (Rev ล่าสุด)</label>
+        <label><input type="checkbox" id="edl-sh-cmp" checked> <b>Compare</b> — เทียบโฟลเดอร์กับ ConZoL</label>
         <button class="chk" id="edl-list">สร้างไฟล์รายการ (.xlsx)</button>
       </fieldset>
 
@@ -1189,9 +1194,26 @@
     try {
       await ensureXLSX();
 
+      // เลือกชีตไหนไว้บ้าง — ทำเฉพาะงานที่ชีตนั้นต้องใช้ ไม่ต้องรอของที่ไม่ได้เอา
+      const SH = {
+        mdr:    el('edl-sh-mdr').checked,
+        rev:    el('edl-sh-rev').checked,
+        folder: el('edl-sh-folder').checked,
+        conzol: el('edl-sh-conzol').checked,
+        cmp:    el('edl-sh-cmp').checked
+      };
+      if (!Object.values(SH).some(Boolean)) throw new Error('ยังไม่ได้เลือกชีตสักอัน');
+      if (SH.mdr && !mdrList.length) log('· ติ๊กชีต MDR ไว้ แต่ยังไม่ได้เลือกไฟล์ MDR ในข้อ 2', 'wn');
+      // ชีต MDR ใช้ผลเทียบ ชีต Compare ก็ใช้ — ทั้งคู่ต้องมีทั้งโฟลเดอร์และ ConZoL
+      const needFolder = SH.folder || SH.cmp || SH.mdr;
+      const needConzol = SH.conzol || SH.cmp || SH.mdr || SH.rev;
+      log('ชีตที่จะทำ: ' + Object.keys(SH).filter((k) => SH[k]).join(', '));
+
       // ---- ชีต 1: ไฟล์ที่มีอยู่ในโฟลเดอร์ ----
       let fRows = [];
-      if (rootDir && await ensurePermission()) {
+      if (!needFolder) {
+        log('· ข้ามการอ่านโฟลเดอร์ (ไม่ได้เลือกชีตที่ต้องใช้)', 'sk');
+      } else if (rootDir && await ensurePermission()) {
         statusEl.textContent = 'กำลังอ่านโฟลเดอร์ …';
         log('อ่านไฟล์ในโฟลเดอร์ปลายทาง …');
         await refreshExisting();
@@ -1202,6 +1224,9 @@
       }
 
       // ---- ชีต 2: เอกสารใน ConZoL ----
+      let cRows = [];
+      if (!needConzol) log('· ข้ามการค้น ConZoL (ไม่ได้เลือกชีตที่ต้องใช้)', 'sk');
+      else {
       const codes = disciplineCodes();
       const typed = String(el('edl-listdisc').value || '')
         .split(/[,\s]+/).map((s) => s.trim().toUpperCase()).filter(Boolean);
@@ -1210,13 +1235,14 @@
       const discList = typed.filter((d) => codes.has(d));
       if (!discList.length) discList.push(...[...codes].sort());
       log(`ค้น ConZoL ${discList.length} discipline: ${discList.join(', ')}`);
-      const cRows = await collectConzolRows(discList);
+      cRows = await collectConzolRows(discList);
       log(`  พบเอกสาร ${cRows.length} รายการ`, cRows.length ? 'ok' : 'wn');
+      }
 
       // ---- ประวัติทุก Rev จาก ConZoL ----
       // เอกสารทั้งโปรเจกต์มีหลายพันรายการ ถ้าโหลด MDR ไว้จะดึงเฉพาะที่อยู่ใน MDR
       const hist = new Map();
-      if (el('edl-hist').checked && cRows.length && !stopFlag) {
+      if (SH.rev && cRows.length && !stopFlag) {
         const inMdr = new Set(mdrList.map((m) => norm(m.doc)));
         const want = mdrList.length ? cRows.filter((r) => inMdr.has(norm(r.doc))) : cRows;
         log(`ดึงประวัติ Rev จาก ConZoL ${want.length} เอกสาร …`);
@@ -1269,7 +1295,7 @@
 
       // ---- ชีต MDR: หน้าตาเหมือน MDR ของโปรเจกต์ — ทุก Rev อยู่บรรทัดเดียวกัน ----
       const wb = XLSX.utils.book_new();
-      if (mdrList.length) {
+      if (SH.mdr && mdrList.length) {
         const byK = new Map(cmp.map((r) => [norm(r.doc), r]));
         const BASE = ['S/N', 'Document No.', 'Title', 'Activity ID', 'Budget', 'Class',
                       'Latest Rev.', 'Latest Issue Status', "Latest Owner's Reply", 'Progress',
@@ -1313,12 +1339,10 @@
         XLSX.utils.book_append_sheet(wb, mkSheet([h1, h2].concat(rows), widths, 1, merges), 'MDR');
         log(`  ชีต MDR: ${rows.length} รายการ · ${mdrRoundHdr.length} รอบการส่ง (ตัดที่ยกเลิกออก ${mdrExcluded})`, 'ok');
         if (mdrDropped.length) log('    ยกเลิกใน MDR: ' + mdrDropped.join(', '), 'sk');
-      } else {
-        log('· ยังไม่ได้เลือกไฟล์ MDR ในข้อ 2 — ข้ามชีต MDR', 'wn');
       }
 
       // ---- ชีต ConZoL Revisions: หนึ่งบรรทัดต่อหนึ่ง Rev ไว้เรียง/กรองตามวันที่หรือเลข TR ----
-      if (hist.size) {
+      if (SH.rev && hist.size) {
         const titleOf = new Map(cRows.map((r) => [norm(r.doc), r]));
         const rv = [];
         for (const [k, h] of hist) {
@@ -1336,33 +1360,38 @@
       }
 
       // ---- เขียนไฟล์ ----
-      XLSX.utils.book_append_sheet(wb, mkSheet(
+      if (SH.folder) XLSX.utils.book_append_sheet(wb, mkSheet(
         [['S/N', 'Document No.', 'Rev', 'Title', 'File Name', 'Type', 'Folder', 'Status', 'Size (MB)', 'Modified']]
           .concat(fRows.map((r, i) => [i + 1, r.doc, r.rev, r.title, r.file, r.ext, r.folder, r.status, r.size, r.mtime])),
         [6, 26, 6, 46, 52, 7, 34, 12, 10, 12]), 'Folder');
 
-      XLSX.utils.book_append_sheet(wb, mkSheet(
+      if (SH.conzol) XLSX.utils.book_append_sheet(wb, mkSheet(
         [['S/N', 'Document No.', 'Rev', 'Title', 'Discipline', 'Group Code', 'Group Name', 'Area', 'PDF', 'Native File', 'Target Folder']]
           .concat(cRows.map((r, i) => [i + 1, r.doc, r.rev, r.title, r.disc || '', r.groupCode || '', r.groupName || '',
             areaOf(r.doc, r.groupCode), 'Y', r.fileHref ? String(r.fileExt || 'zip').toUpperCase() : '',
             targetPath(r.doc, r.groupCode, r.groupName).join('\\')])),
         [6, 26, 6, 46, 11, 12, 30, 10, 5, 11, 34]), 'ConZoL');
 
-      XLSX.utils.book_append_sheet(wb, mkSheet(
+      if (SH.cmp) XLSX.utils.book_append_sheet(wb, mkSheet(
         [['S/N', 'Document No.', 'Title', 'ConZoL Rev', 'Folder Rev', 'Folder', 'Result']]
           .concat(cmp.map((r, i) => [i + 1, r.doc, r.title, r.crev, r.frev, r.folder, r.result])),
         [6, 26, 46, 11, 11, 34, 30]), 'Compare');
 
+      if (!wb.SheetNames.length) throw new Error('ไม่มีชีตไหนมีข้อมูลให้เขียน');
+
       const d = new Date();
       const stamp = d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0');
-      const name = `ConZoL_document_list_${stamp}.xlsx`;
+      // ถ้าเอาชีตเดียว ใส่ชื่อชีตไว้ในชื่อไฟล์ จะได้ไม่ทับไฟล์เต็มที่ทำไว้ก่อนหน้า
+      const tag = wb.SheetNames.length === 1 ? '_' + wb.SheetNames[0].replace(/\s+/g, '') : '';
+      const name = `ConZoL_document_list${tag}_${stamp}.xlsx`;
       const blob = new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })],
         { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       if (rootDir && await ensurePermission()) { await writeInto(rootDir, name, blob); log('· บันทึก ' + name + ' ลงโฟลเดอร์แล้ว', 'ok'); }
       else browserDownload(name, blob);
 
       const need = cmp.filter((r) => /to download/.test(r.result)).length;
-      statusEl.textContent = `รายการเสร็จ: โฟลเดอร์ ${fRows.length} ไฟล์ · ConZoL ${cRows.length} รายการ · ยังไม่ครบ ${need}`;
+      statusEl.textContent = `รายการเสร็จ: ${wb.SheetNames.length} ชีต (${wb.SheetNames.join(', ')})`
+        + (SH.cmp || SH.mdr ? ` · ยังไม่ครบ ${need}` : '');
       log('— จบการทำรายการ —');
     } catch (e) {
       log('· ทำรายการไม่สำเร็จ: ' + e.message, 'er');

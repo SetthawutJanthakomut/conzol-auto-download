@@ -94,6 +94,11 @@ Everything is read from the header text, never from fixed column letters, so ext
 sections or a reordered MDR all still read correctly. Rows struck through or marked *Delete* are left
 out and named in the log. Text written into the workbook is always English, in both language builds.
 
+Tick only the sheets you want — the tool then does only the work those sheets need, so asking for
+**ConZoL Revisions** alone skips the folder scan, and **Folder** alone skips ConZoL entirely. A file
+built from a single sheet is named after it (`ConZoL_document_list_ConZoLRevisions_20260905.xlsx`), so
+it never overwrites the full list.
+
 Leave the discipline box empty for every discipline in ConZoL's dropdown, or type the ones you want
 (`MA-DWG, MA-CAL`). It reads like an MDR and opens straight in Excel.
 
@@ -246,6 +251,10 @@ ConZoL เก็บประวัติทุก Rev ของแต่ละ�
 ทุกอย่างอ่านจากข้อความหัวตาราง ไม่ผูกกับตัวอักษรคอลัมน์ เพิ่มรอบการส่ง เปลี่ยนชื่อหัวข้อ หรือสลับคอลัมน์
 ก็ยังอ่านได้ถูก แถวที่ขีดฆ่าหรือเขียน *Delete* จะถูกตัดออกและแจ้งเลขเอกสารไว้ในบันทึกการทำงาน
 ข้อความที่เขียนลงไฟล์ Excel เป็นภาษาอังกฤษเสมอ ทั้งเวอร์ชันไทยและอังกฤษ
+
+ติ๊กเลือกเฉพาะชีตที่ต้องการได้ ระบบจะทำเฉพาะงานที่ชีตนั้นต้องใช้ — เอาแค่ **ConZoL Revisions**
+ก็ไม่ต้องรออ่านโฟลเดอร์ เอาแค่ **Folder** ก็ไม่ต้องค้น ConZoL เลย ถ้าเลือกชีตเดียว
+ชื่อไฟล์จะมีชื่อชีตกำกับ (`ConZoL_document_list_ConZoLRevisions_20260905.xlsx`) ไม่ทับไฟล์เต็ม
 
 ช่อง discipline เว้นว่าง = ไล่ทุกอย่างที่มีใน dropdown ของ ConZoL หรือพิมพ์เฉพาะที่ต้องการก็ได้
 (`MA-DWG, MA-CAL`) หน้าตาอ่านง่ายคล้าย MDR เปิดใน Excel ได้เลย
