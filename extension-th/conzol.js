@@ -8,7 +8,7 @@
   // ถ้ามีกล่องอยู่แล้ว ให้ชุดที่มาทีหลังหยุดทำงาน ไม่งั้น id จะซ้ำและปุ่มจะกดไม่ติด
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '4.9';   // ซิงก์อัตโนมัติจาก @version ตอน build
+  const VERSION = '5.0';   // ซิงก์อัตโนมัติจาก @version ตอน build
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.th.user.js';   // build.py ใส่ให้ตามภาษา
 
   // ---------------- ตั้งค่าได้ตรงนี้ ----------------
@@ -54,6 +54,7 @@
 
   let stopFlag = false, running = false;
   let mdrList = [], mdrExcluded = 0, mdrDropped = [], lastReport = [];
+  let mdrRoundHdr = [], mdrRoundKey = '';   // ชื่อรอบการส่งใน MDR (1st Issue, 2nd Issue …)
   let rootDir = null;          // FileSystemDirectoryHandle
   let existing = new Map();    // DOCNO -> [{name, rev, rank, parent}]
 
@@ -111,6 +112,38 @@
     }
     return parts;
   }
+
+  // ข้อความที่เขียนลงไฟล์ Excel ใช้ภาษาอังกฤษเสมอ ทั้งเวอร์ชันไทยและอังกฤษ
+  // (เป็นเอกสารที่ส่งต่อให้ทีมและเจ้าของงาน ไม่ใช่หน้าจอ)
+  const XL = {
+    cur: 'Current', sup: 'Superseded',
+    same: 'Up to date',
+    czNew: 'ConZoL is newer - to download',
+    noFile: 'Not in the folder yet - to download',
+    fdNew: 'Folder is newer than ConZoL',
+    noCz: 'Not found in ConZoL',
+    vsSame: 'Same revision',
+    vsCzNew: 'ConZoL is newer than the MDR',
+    vsMdrNew: 'MDR is newer than ConZoL',
+    vsSeries: 'Different revision series (T/R)',
+    vsNoRev: 'MDR has no revision yet',
+    vsNoCz: '-'
+  };
+
+  // ช่องของหนึ่งรอบการส่ง เรียงเหมือน MDR — ใช้ทั้งชีต MDR (แนวนอน) และชีต Revisions (แนวตั้ง)
+  const RND_COLS = [
+    ['Issue Status',    (r) => r.sts,        12],
+    ['Rev.',            (r) => r.rev,         7],
+    ['Plan Start',      (r) => r.planStart,  11],
+    ['Plan Finish',     (r) => r.planFinish, 11],
+    ['Forecast',        (r) => r.forecast,   12],
+    ['Submitted',       (r) => r.sent,       11],
+    ['TR No.',          (r) => r.tr,         10],
+    ["Owner's Reply",   (r) => r.reply,      13],
+    ['Reply Due',       (r) => r.replyDue,   11],
+    ['Reply Received',  (r) => r.replyBack,  14],
+    ['Reply TR No.',    (r) => r.replyTr,    12]
+  ];
 
   const revRank = (series, num) => (String(series).toUpperCase() === 'T' ? 1000 : 0) + parseInt(num, 10);
 
@@ -317,8 +350,13 @@
       for (let C = rng.s.c; C <= rng.e.c; C++) {
         const t = cellText(ws, R, C).toUpperCase().replace(/\s+/g, ' ');
         if (!DOC_HDR.includes(t)) continue;
+        // หัวตารางกินหลายบรรทัด — หยุดก่อนถึงแถวข้อมูลแถวแรก ไม่งั้นจะอ่านข้อมูลเป็นหัวตาราง
+        let hdrEnd = Math.min(R + 4, rng.e.r);
+        for (let r = R + 1; r <= Math.min(R + 8, rng.e.r); r++) {
+          if (DOC_RE.test(cellText(ws, r, C))) { hdrEnd = r - 1; break; }
+        }
         const cols = { doc: C, rev: [], sts: [] };
-        for (let r = R; r <= Math.min(R + 4, rng.e.r); r++) {
+        for (let r = R; r <= hdrEnd; r++) {
           for (let c = rng.s.c; c <= rng.e.c; c++) {
             const h = cellText(ws, r, c).toUpperCase().replace(/\s+/g, ' ');
             if (!h) continue;
@@ -336,6 +374,48 @@
         const rv = new Set(cols.rev);
         cols.issue = cols.sts.filter((c) => rv.has(c + 1));
         cols.reply = cols.sts.filter((c) => !rv.has(c + 1));
+
+        // แต่ละรอบการส่ง (1st / 2nd / 3rd Issue …) เริ่มที่คอลัมน์ Rev. ของรอบนั้น
+        // ในหนึ่งรอบเรียงแบบนี้เสมอ:  Status · Rev. · Plan(T0) · Forecast · Actual · TR No.
+        //                              แล้วต่อด้วย Owner's Reply:  Status · Plan · Actual · TR No.
+        // ใช้ช่อง Status ของ Owner เป็นเส้นแบ่ง จะได้ไม่ต้องผูกกับหัวข้อกลุ่ม
+        const labelAt = (c) => {
+          for (let r = hdrEnd; r >= R; r--) {
+            const t = cellText(ws, r, c).toUpperCase().replace(/\s+/g, ' ');
+            if (t) return t;
+          }
+          return '';
+        };
+        cols.rounds = cols.rev.map((rc, i) => {
+          const stop = (i + 1 < cols.rev.length) ? cols.rev[i + 1] - 1 : rng.e.c + 1;
+          const rd = { rev: rc, sts: rc - 1, rsts: null, fc: null, plan: [], act: [], tr: [] };
+          for (let c = rc + 1; c < stop; c++) {
+            const L = labelAt(c);
+            if (!L) continue;
+            if (L === 'STATUS') { if (rd.rsts == null) rd.rsts = c; }
+            else if (L === 'ACTUAL') rd.act.push(c);
+            else if (L === 'TR NO.' || L === 'TR NO') rd.tr.push(c);
+            else if (L === 'FORECAST') { if (rd.fc == null) rd.fc = c; }
+            // Plan(T0) แตกเป็น Start/Finish อีกบรรทัด หัวที่อ่านได้จึงเป็น START/FINISH เฉย ๆ
+            else if (L.indexOf('PLAN') === 0 || L === 'START' || L === 'FINISH') rd.plan.push(c);
+          }
+          const div = rd.rsts == null ? Infinity : rd.rsts;
+          rd.iPlan = rd.plan.filter((c) => c < div);
+          rd.rPlan = rd.plan.filter((c) => c > div);
+          rd.iAct  = rd.act.filter((c) => c < div);
+          rd.rAct  = rd.act.filter((c) => c > div);
+          rd.iTr   = rd.tr.filter((c) => c < div);
+          rd.rTr   = rd.tr.filter((c) => c > div);
+          return rd;
+        });
+        // ชื่อรอบ = หัวข้อใหญ่ + ชื่อบล็อก เช่น "For Construction / For Final - 2nd Issue"
+        let sec = '';
+        cols.roundName = cols.rounds.map((rd) => {
+          const s1 = cellText(ws, R, rd.sts).replace(/\s+/g, ' ');
+          if (s1) sec = s1;
+          const s2 = cellText(ws, R + 1, rd.sts).replace(/\s+/g, ' ');
+          return (sec ? sec + ' - ' : '') + (s2 || 'Issue');
+        });
         return { row: R, cols };
       }
     }
@@ -348,6 +428,7 @@
 
   function readWorkbook(wb, sheetName) {
     const keep = new Map(), dropped = new Set();
+    mdrRoundHdr = []; mdrRoundKey = '';
     const sheets = sheetName === '*' ? wb.SheetNames : [sheetName];
     for (const sn of sheets) {
       const ws = wb.Sheets[sn];
@@ -389,6 +470,23 @@
           row.rev = lastOf(ws, R, c.rev);
           row.issue = lastOf(ws, R, c.issue);
           row.reply = lastOf(ws, R, c.reply);
+          // ชื่อรอบการส่งเก็บครั้งเดียว ใช้เป็นหัวตารางของชีต MDR
+          if (c.roundName && c.roundName.length) {
+            row.rndKey = c.roundName.join('\u0001');
+            if (!mdrRoundHdr.length) { mdrRoundHdr = c.roundName.slice(); mdrRoundKey = row.rndKey; }
+          }
+          const at = (col) => (col == null ? '' : cellText(ws, R, col));
+          const first = (list) => (list && list.length ? at(list[0]) : '');
+          row.rounds = (c.rounds || []).map((rd, i) => ({
+            n: i + 1,
+            rev: at(rd.rev), sts: at(rd.sts),
+            planStart: first(rd.iPlan),
+            planFinish: rd.iPlan && rd.iPlan.length > 1 ? at(rd.iPlan[1]) : '',
+            forecast: at(rd.fc),
+            sent: first(rd.iAct), tr: first(rd.iTr),
+            reply: at(rd.rsts), replyDue: first(rd.rPlan),
+            replyBack: first(rd.rAct), replyTr: first(rd.rTr)
+          }));
         }
         keep.set(norm(docVal), row);
       }
@@ -1036,11 +1134,14 @@
     return [...index.values()];
   }
 
-  function mkSheet(aoa, widths) {
+  // hdrRow = แถวหัวตารางที่ติด filter (0 = แถวแรก) · merges = ช่องที่รวมกันบนหัวตาราง
+  function mkSheet(aoa, widths, hdrRow, merges) {
+    const h = hdrRow || 0;
     const ws = XLSX.utils.aoa_to_sheet(aoa);
     ws['!cols'] = widths.map((w) => ({ wch: w }));
-    ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 },
-      e: { r: Math.max(aoa.length - 1, 1), c: widths.length - 1 } }) };
+    ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: h, c: 0 },
+      e: { r: Math.max(aoa.length - 1, h + 1), c: widths.length - 1 } }) };
+    if (merges && merges.length) ws['!merges'] = merges;
     return ws;
   }
 
@@ -1087,14 +1188,15 @@
       const cmp = [];
       for (const k of new Set([...byDocConzol.keys(), ...byDocFolder.keys()])) {
         const c = byDocConzol.get(k), f = byDocFolder.get(k);
+        // ค่าที่ลงในไฟล์ Excel เป็นภาษาอังกฤษเสมอ — MDR เป็นเอกสารภาษาอังกฤษ
         let result;
-        if (c && !f) result = 'ยังไม่มีในโฟลเดอร์ — ต้องโหลด';
-        else if (f && !c) result = 'ไม่พบใน ConZoL';
+        if (c && !f) result = 'Not in the folder yet - to download';
+        else if (f && !c) result = 'Not found in ConZoL';
         else {
           const rc = rankOf(c.rev), rf = rankOf(f.rev);
-          if (rc === rf) result = 'ตรงกัน';
-          else if (rc > rf) result = 'ConZoL ใหม่กว่า — ต้องโหลด';
-          else result = 'ในโฟลเดอร์ใหม่กว่า ConZoL';
+          if (rc === rf) result = 'Up to date';
+          else if (rc > rf) result = 'ConZoL is newer - to download';
+          else result = 'Folder is newer than ConZoL';
         }
         cmp.push({
           doc: (c && c.doc) || (f && f.doc) || k,
@@ -1106,31 +1208,64 @@
       }
       cmp.sort((a, b) => a.doc.localeCompare(b.doc));
 
-      // ---- ชีต MDR: หน้าตาเหมือน MDR ของโปรเจกต์ + ช่องสรุปผล ----
+      // ---- ชีต MDR: หน้าตาเหมือน MDR ของโปรเจกต์ — ทุกรอบการส่งอยู่บรรทัดเดียวกัน ----
       const wb = XLSX.utils.book_new();
       if (mdrList.length) {
         const byK = new Map(cmp.map((r) => [norm(r.doc), r]));
+        const BASE = ['S/N', 'Document No.', 'Title', 'Activity ID', 'Budget', 'Class',
+                      'Latest Rev.', 'Latest Issue Status', "Latest Owner's Reply", 'Progress',
+                      'ConZoL Rev', 'MDR vs ConZoL', 'Result', 'MDR Sheet'];
+        const BASE_W = [6, 26, 46, 13, 9, 7, 11, 17, 18, 9, 11, 28, 30, 18];
+
+        // หัวตาราง 2 บรรทัด: บรรทัดบน = ชื่อรอบ (รวมช่องเหมือน MDR) · บรรทัดล่าง = ชื่อช่อง
+        const h1 = BASE.map(() => ''), h2 = BASE.slice(), widths = BASE_W.slice(), merges = [];
+        mdrRoundHdr.forEach((name) => {
+          const at = h2.length;
+          RND_COLS.forEach((f, j) => { h1.push(j === 0 ? name : ''); h2.push(f[0]); widths.push(f[2]); });
+          merges.push({ s: { r: 0, c: at }, e: { r: 0, c: at + RND_COLS.length - 1 } });
+        });
+
         const rows = mdrList.map((m, i) => {
           const c = byK.get(norm(m.doc));
           const czRev = c ? c.crev : '';
           // เทียบ Rev ที่ MDR บันทึกไว้ กับ Rev ล่าสุดใน ConZoL
-          let vs = '';
-          if (!czRev) vs = '-';
-          else if (!m.rev) vs = 'MDR ยังไม่ลง Rev';
-          else if (norm(m.rev) === norm(czRev)) vs = 'ตรงกัน';
+          let vs;
+          if (!czRev) vs = XL.vsNoCz;
+          else if (!m.rev) vs = XL.vsNoRev;
+          else if (norm(m.rev) === norm(czRev)) vs = XL.vsSame;
           else if (String(m.rev).trim()[0].toUpperCase() !== String(czRev).trim()[0].toUpperCase())
-            vs = 'คนละชุด Rev (T/R)';   // T กับ R เทียบกันตรง ๆ ไม่ได้ ต้องให้คนดู
-          else vs = (rankOf(czRev) > rankOf(m.rev)) ? 'ConZoL ใหม่กว่า MDR' : 'MDR ใหม่กว่า ConZoL';
-          return [m.sn || (i + 1), m.doc, m.title || '', m.act || '', m.bud || '', m.cls || '',
-                  m.rev || '', m.issue || '', m.reply || '', m.prg || '',
-                  czRev, vs, c ? c.result : 'ไม่พบใน ConZoL', m.sheet || ''];
+            vs = XL.vsSeries;   // T กับ R เทียบกันตรง ๆ ไม่ได้ ต้องให้คนดู
+          else vs = (rankOf(czRev) > rankOf(m.rev)) ? XL.vsCzNew : XL.vsMdrNew;
+
+          const line = [m.sn || (i + 1), m.doc, m.title || '', m.act || '', m.bud || '', m.cls || '',
+                        m.rev || '', m.issue || '', m.reply || '', m.prg || '',
+                        czRev, vs, c ? c.result : XL.noCz, m.sheet || ''];
+          // ชีตที่หัวตารางไม่เหมือนกัน ปล่อยว่างไว้ ดีกว่าเอาค่าไปใส่ผิดช่อง
+          const ok = m.rndKey === mdrRoundKey;
+          mdrRoundHdr.forEach((name, k) => {
+            const rd = ok && m.rounds ? m.rounds[k] : null;
+            RND_COLS.forEach((f) => line.push(rd ? (f[1](rd) || '') : ''));
+          });
+          return line;
         });
-        XLSX.utils.book_append_sheet(wb, mkSheet(
-          [['S/N', 'Document No.', 'Title', 'Activity ID', 'Budget', 'Class',
-            'Rev.', 'Issue Status', "Owner's Reply", 'Progress', 'ConZoL Rev', 'MDR vs ConZoL', 'Result', 'MDR Sheet']].concat(rows),
-          [6, 26, 46, 13, 9, 7, 7, 12, 13, 9, 11, 22, 30, 18]), 'MDR');
-        log(`  ชีต MDR: ${rows.length} รายการ (ตัดที่ยกเลิกออก ${mdrExcluded})`, 'ok');
+
+        XLSX.utils.book_append_sheet(wb, mkSheet([h1, h2].concat(rows), widths, 1, merges), 'MDR');
+        log(`  ชีต MDR: ${rows.length} รายการ · ${mdrRoundHdr.length} รอบการส่ง (ตัดที่ยกเลิกออก ${mdrExcluded})`, 'ok');
         if (mdrDropped.length) log('    ยกเลิกใน MDR: ' + mdrDropped.join(', '), 'sk');
+
+        // ---- ชีต Revisions: หนึ่งบรรทัดต่อหนึ่งรอบการส่ง ไว้เรียง/กรองตามวันที่ ----
+        const rv = [];
+        for (const m of mdrList) {
+          (m.rounds || []).forEach((r, k) => {
+            if (!(r.rev || r.sts || r.sent || r.reply)) return;
+            rv.push([m.sn || '', m.doc, m.title || '', mdrRoundHdr[k] || ('Issue ' + (k + 1))]
+              .concat(RND_COLS.map((f) => f[1](r) || '')).concat([m.sheet || '']));
+          });
+        }
+        XLSX.utils.book_append_sheet(wb, mkSheet(
+          [['S/N', 'Document No.', 'Title', 'Issue'].concat(RND_COLS.map((f) => f[0])).concat(['MDR Sheet'])].concat(rv),
+          [6, 26, 46, 42].concat(RND_COLS.map((f) => f[2])).concat([18])), 'Revisions');
+        log(`  ชีต Revisions: ${rv.length} รอบการส่ง`, 'ok');
       } else {
         log('· ยังไม่ได้เลือกไฟล์ MDR ในข้อ 2 — ข้ามชีต MDR', 'wn');
       }
@@ -1161,7 +1296,7 @@
       if (rootDir && await ensurePermission()) { await writeInto(rootDir, name, blob); log('· บันทึก ' + name + ' ลงโฟลเดอร์แล้ว', 'ok'); }
       else browserDownload(name, blob);
 
-      const need = cmp.filter((r) => /ต้องโหลด/.test(r.result)).length;
+      const need = cmp.filter((r) => /to download/.test(r.result)).length;
       statusEl.textContent = `รายการเสร็จ: โฟลเดอร์ ${fRows.length} ไฟล์ · ConZoL ${cRows.length} รายการ · ยังไม่ครบ ${need}`;
       log('— จบการทำรายการ —');
     } catch (e) {

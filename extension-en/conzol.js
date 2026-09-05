@@ -6,7 +6,7 @@
   // If a panel already exists the later copy stops here - otherwise ids collide and buttons stop responding
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '4.9';   // kept in sync with @version at build time
+  const VERSION = '5.0';   // kept in sync with @version at build time
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.user.js';   // filled in per language at build time
 
   // ---------------- Settings ----------------
@@ -52,6 +52,7 @@
 
   let stopFlag = false, running = false;
   let mdrList = [], mdrExcluded = 0, mdrDropped = [], lastReport = [];
+  let mdrRoundHdr = [], mdrRoundKey = '';   // Names of the MDR's issue rounds (1st Issue, 2nd Issue …)
   let rootDir = null;          // FileSystemDirectoryHandle
   let existing = new Map();    // DOCNO -> [{name, rev, rank, parent}]
 
@@ -109,6 +110,38 @@
     }
     return parts;
   }
+
+  // Text written into the Excel file is always English, in both the Thai and English builds
+  // (it is a document passed on to the team and the owner, not a screen)
+  const XL = {
+    cur: 'Current', sup: 'Superseded',
+    same: 'Up to date',
+    czNew: 'ConZoL is newer - to download',
+    noFile: 'Not in the folder yet - to download',
+    fdNew: 'Folder is newer than ConZoL',
+    noCz: 'Not found in ConZoL',
+    vsSame: 'Same revision',
+    vsCzNew: 'ConZoL is newer than the MDR',
+    vsMdrNew: 'MDR is newer than ConZoL',
+    vsSeries: 'Different revision series (T/R)',
+    vsNoRev: 'MDR has no revision yet',
+    vsNoCz: '-'
+  };
+
+  // The fields of one issue round, ordered as in the MDR - used by the MDR sheet (across) and Revisions (down)
+  const RND_COLS = [
+    ['Issue Status',    (r) => r.sts,        12],
+    ['Rev.',            (r) => r.rev,         7],
+    ['Plan Start',      (r) => r.planStart,  11],
+    ['Plan Finish',     (r) => r.planFinish, 11],
+    ['Forecast',        (r) => r.forecast,   12],
+    ['Submitted',       (r) => r.sent,       11],
+    ['TR No.',          (r) => r.tr,         10],
+    ["Owner's Reply",   (r) => r.reply,      13],
+    ['Reply Due',       (r) => r.replyDue,   11],
+    ['Reply Received',  (r) => r.replyBack,  14],
+    ['Reply TR No.',    (r) => r.replyTr,    12]
+  ];
 
   const revRank = (series, num) => (String(series).toUpperCase() === 'T' ? 1000 : 0) + parseInt(num, 10);
 
@@ -315,8 +348,13 @@
       for (let C = rng.s.c; C <= rng.e.c; C++) {
         const t = cellText(ws, R, C).toUpperCase().replace(/\s+/g, ' ');
         if (!DOC_HDR.includes(t)) continue;
+        // The header spans several rows - stop before the first data row, or data reads as a heading
+        let hdrEnd = Math.min(R + 4, rng.e.r);
+        for (let r = R + 1; r <= Math.min(R + 8, rng.e.r); r++) {
+          if (DOC_RE.test(cellText(ws, r, C))) { hdrEnd = r - 1; break; }
+        }
         const cols = { doc: C, rev: [], sts: [] };
-        for (let r = R; r <= Math.min(R + 4, rng.e.r); r++) {
+        for (let r = R; r <= hdrEnd; r++) {
           for (let c = rng.s.c; c <= rng.e.c; c++) {
             const h = cellText(ws, r, c).toUpperCase().replace(/\s+/g, ' ');
             if (!h) continue;
@@ -334,6 +372,48 @@
         const rv = new Set(cols.rev);
         cols.issue = cols.sts.filter((c) => rv.has(c + 1));
         cols.reply = cols.sts.filter((c) => !rv.has(c + 1));
+
+        // Each issue round (1st / 2nd / 3rd Issue …) starts at that round's Rev. column
+        // A round always runs:  Status · Rev. · Plan(T0) · Forecast · Actual · TR No.
+        //                        followed by the Owner's Reply:  Status · Plan · Actual · TR No.
+        // The owner's Status column is the divider, so no group heading has to be matched
+        const labelAt = (c) => {
+          for (let r = hdrEnd; r >= R; r--) {
+            const t = cellText(ws, r, c).toUpperCase().replace(/\s+/g, ' ');
+            if (t) return t;
+          }
+          return '';
+        };
+        cols.rounds = cols.rev.map((rc, i) => {
+          const stop = (i + 1 < cols.rev.length) ? cols.rev[i + 1] - 1 : rng.e.c + 1;
+          const rd = { rev: rc, sts: rc - 1, rsts: null, fc: null, plan: [], act: [], tr: [] };
+          for (let c = rc + 1; c < stop; c++) {
+            const L = labelAt(c);
+            if (!L) continue;
+            if (L === 'STATUS') { if (rd.rsts == null) rd.rsts = c; }
+            else if (L === 'ACTUAL') rd.act.push(c);
+            else if (L === 'TR NO.' || L === 'TR NO') rd.tr.push(c);
+            else if (L === 'FORECAST') { if (rd.fc == null) rd.fc = c; }
+            // Plan(T0) splits into Start/Finish on the next row, so the heading read back is just START/FINISH
+            else if (L.indexOf('PLAN') === 0 || L === 'START' || L === 'FINISH') rd.plan.push(c);
+          }
+          const div = rd.rsts == null ? Infinity : rd.rsts;
+          rd.iPlan = rd.plan.filter((c) => c < div);
+          rd.rPlan = rd.plan.filter((c) => c > div);
+          rd.iAct  = rd.act.filter((c) => c < div);
+          rd.rAct  = rd.act.filter((c) => c > div);
+          rd.iTr   = rd.tr.filter((c) => c < div);
+          rd.rTr   = rd.tr.filter((c) => c > div);
+          return rd;
+        });
+        // Round name = section + block, e.g. "For Construction / For Final - 2nd Issue"
+        let sec = '';
+        cols.roundName = cols.rounds.map((rd) => {
+          const s1 = cellText(ws, R, rd.sts).replace(/\s+/g, ' ');
+          if (s1) sec = s1;
+          const s2 = cellText(ws, R + 1, rd.sts).replace(/\s+/g, ' ');
+          return (sec ? sec + ' - ' : '') + (s2 || 'Issue');
+        });
         return { row: R, cols };
       }
     }
@@ -346,6 +426,7 @@
 
   function readWorkbook(wb, sheetName) {
     const keep = new Map(), dropped = new Set();
+    mdrRoundHdr = []; mdrRoundKey = '';
     const sheets = sheetName === '*' ? wb.SheetNames : [sheetName];
     for (const sn of sheets) {
       const ws = wb.Sheets[sn];
@@ -387,6 +468,23 @@
           row.rev = lastOf(ws, R, c.rev);
           row.issue = lastOf(ws, R, c.issue);
           row.reply = lastOf(ws, R, c.reply);
+          // The round names are captured once and become the MDR sheet's headings
+          if (c.roundName && c.roundName.length) {
+            row.rndKey = c.roundName.join('\u0001');
+            if (!mdrRoundHdr.length) { mdrRoundHdr = c.roundName.slice(); mdrRoundKey = row.rndKey; }
+          }
+          const at = (col) => (col == null ? '' : cellText(ws, R, col));
+          const first = (list) => (list && list.length ? at(list[0]) : '');
+          row.rounds = (c.rounds || []).map((rd, i) => ({
+            n: i + 1,
+            rev: at(rd.rev), sts: at(rd.sts),
+            planStart: first(rd.iPlan),
+            planFinish: rd.iPlan && rd.iPlan.length > 1 ? at(rd.iPlan[1]) : '',
+            forecast: at(rd.fc),
+            sent: first(rd.iAct), tr: first(rd.iTr),
+            reply: at(rd.rsts), replyDue: first(rd.rPlan),
+            replyBack: first(rd.rAct), replyTr: first(rd.rTr)
+          }));
         }
         keep.set(norm(docVal), row);
       }
@@ -1034,11 +1132,14 @@
     return [...index.values()];
   }
 
-  function mkSheet(aoa, widths) {
+  // hdrRow = the header row the filter sits on (0 = first row) · merges = merged header cells
+  function mkSheet(aoa, widths, hdrRow, merges) {
+    const h = hdrRow || 0;
     const ws = XLSX.utils.aoa_to_sheet(aoa);
     ws['!cols'] = widths.map((w) => ({ wch: w }));
-    ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 },
-      e: { r: Math.max(aoa.length - 1, 1), c: widths.length - 1 } }) };
+    ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: h, c: 0 },
+      e: { r: Math.max(aoa.length - 1, h + 1), c: widths.length - 1 } }) };
+    if (merges && merges.length) ws['!merges'] = merges;
     return ws;
   }
 
@@ -1085,6 +1186,7 @@
       const cmp = [];
       for (const k of new Set([...byDocConzol.keys(), ...byDocFolder.keys()])) {
         const c = byDocConzol.get(k), f = byDocFolder.get(k);
+        // Values written into the workbook are always English - the MDR is an English document
         let result;
         if (c && !f) result = 'Not in the folder yet - to download';
         else if (f && !c) result = 'Not found in ConZoL';
@@ -1092,7 +1194,7 @@
           const rc = rankOf(c.rev), rf = rankOf(f.rev);
           if (rc === rf) result = 'Up to date';
           else if (rc > rf) result = 'ConZoL is newer - to download';
-          else result = 'The folder is newer than ConZoL';
+          else result = 'Folder is newer than ConZoL';
         }
         cmp.push({
           doc: (c && c.doc) || (f && f.doc) || k,
@@ -1104,31 +1206,64 @@
       }
       cmp.sort((a, b) => a.doc.localeCompare(b.doc));
 
-      // ---- Sheet MDR: laid out like the project MDR, plus a Result column ----
+      // ---- Sheet MDR: laid out like the project MDR - every issue round on the same row ----
       const wb = XLSX.utils.book_new();
       if (mdrList.length) {
         const byK = new Map(cmp.map((r) => [norm(r.doc), r]));
+        const BASE = ['S/N', 'Document No.', 'Title', 'Activity ID', 'Budget', 'Class',
+                      'Latest Rev.', 'Latest Issue Status', "Latest Owner's Reply", 'Progress',
+                      'ConZoL Rev', 'MDR vs ConZoL', 'Result', 'MDR Sheet'];
+        const BASE_W = [6, 26, 46, 13, 9, 7, 11, 17, 18, 9, 11, 28, 30, 18];
+
+        // A two-row header: the top row names the round (merged, as in the MDR), the second names the field
+        const h1 = BASE.map(() => ''), h2 = BASE.slice(), widths = BASE_W.slice(), merges = [];
+        mdrRoundHdr.forEach((name) => {
+          const at = h2.length;
+          RND_COLS.forEach((f, j) => { h1.push(j === 0 ? name : ''); h2.push(f[0]); widths.push(f[2]); });
+          merges.push({ s: { r: 0, c: at }, e: { r: 0, c: at + RND_COLS.length - 1 } });
+        });
+
         const rows = mdrList.map((m, i) => {
           const c = byK.get(norm(m.doc));
           const czRev = c ? c.crev : '';
           // Compare the revision the MDR records against the latest revision in ConZoL
-          let vs = '';
-          if (!czRev) vs = '-';
-          else if (!m.rev) vs = 'MDR has no revision yet';
-          else if (norm(m.rev) === norm(czRev)) vs = 'Up to date';
+          let vs;
+          if (!czRev) vs = XL.vsNoCz;
+          else if (!m.rev) vs = XL.vsNoRev;
+          else if (norm(m.rev) === norm(czRev)) vs = XL.vsSame;
           else if (String(m.rev).trim()[0].toUpperCase() !== String(czRev).trim()[0].toUpperCase())
-            vs = 'Different revision series (T/R)';   // T and R cannot be compared directly - leave the call to a person
-          else vs = (rankOf(czRev) > rankOf(m.rev)) ? 'ConZoL is newer than the MDR' : 'MDR is newer than ConZoL';
-          return [m.sn || (i + 1), m.doc, m.title || '', m.act || '', m.bud || '', m.cls || '',
-                  m.rev || '', m.issue || '', m.reply || '', m.prg || '',
-                  czRev, vs, c ? c.result : 'Not found in ConZoL', m.sheet || ''];
+            vs = XL.vsSeries;   // T and R cannot be compared directly - leave the call to a person
+          else vs = (rankOf(czRev) > rankOf(m.rev)) ? XL.vsCzNew : XL.vsMdrNew;
+
+          const line = [m.sn || (i + 1), m.doc, m.title || '', m.act || '', m.bud || '', m.cls || '',
+                        m.rev || '', m.issue || '', m.reply || '', m.prg || '',
+                        czRev, vs, c ? c.result : XL.noCz, m.sheet || ''];
+          // A sheet with a different header is left blank rather than risk values landing in the wrong column
+          const ok = m.rndKey === mdrRoundKey;
+          mdrRoundHdr.forEach((name, k) => {
+            const rd = ok && m.rounds ? m.rounds[k] : null;
+            RND_COLS.forEach((f) => line.push(rd ? (f[1](rd) || '') : ''));
+          });
+          return line;
         });
-        XLSX.utils.book_append_sheet(wb, mkSheet(
-          [['S/N', 'Document No.', 'Title', 'Activity ID', 'Budget', 'Class',
-            'Rev.', 'Issue Status', "Owner's Reply", 'Progress', 'ConZoL Rev', 'MDR vs ConZoL', 'Result', 'MDR Sheet']].concat(rows),
-          [6, 26, 46, 13, 9, 7, 7, 12, 13, 9, 11, 22, 30, 18]), 'MDR');
-        log(`  MDR sheet: ${rows.length} rows (${mdrExcluded} cancelled row(s) left out)`, 'ok');
+
+        XLSX.utils.book_append_sheet(wb, mkSheet([h1, h2].concat(rows), widths, 1, merges), 'MDR');
+        log(`  MDR sheet: ${rows.length} rows · ${mdrRoundHdr.length} issue rounds (${mdrExcluded} cancelled row(s) left out)`, 'ok');
         if (mdrDropped.length) log('    cancelled in the MDR: ' + mdrDropped.join(', '), 'sk');
+
+        // ---- Sheet Revisions: one line per issue round, for sorting and filtering by date ----
+        const rv = [];
+        for (const m of mdrList) {
+          (m.rounds || []).forEach((r, k) => {
+            if (!(r.rev || r.sts || r.sent || r.reply)) return;
+            rv.push([m.sn || '', m.doc, m.title || '', mdrRoundHdr[k] || ('Issue ' + (k + 1))]
+              .concat(RND_COLS.map((f) => f[1](r) || '')).concat([m.sheet || '']));
+          });
+        }
+        XLSX.utils.book_append_sheet(wb, mkSheet(
+          [['S/N', 'Document No.', 'Title', 'Issue'].concat(RND_COLS.map((f) => f[0])).concat(['MDR Sheet'])].concat(rv),
+          [6, 26, 46, 42].concat(RND_COLS.map((f) => f[2])).concat([18])), 'Revisions');
+        log(`  Revisions sheet: ${rv.length} issue round(s)`, 'ok');
       } else {
         log('· No MDR file chosen in step 2 - the MDR sheet is skipped', 'wn');
       }

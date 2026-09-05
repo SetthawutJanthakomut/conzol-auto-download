@@ -620,32 +620,8 @@
   "// ---- Sheet 3: the two sides compared ----"
  ],
  [
-  "'ยังไม่มีในโฟลเดอร์ — ต้องโหลด'",
-  "'Not in the folder yet - to download'"
- ],
- [
-  "'ไม่พบใน ConZoL'",
-  "'Not found in ConZoL'"
- ],
- [
-  "'ตรงกัน'",
-  "'Up to date'"
- ],
- [
-  "'ConZoL ใหม่กว่า — ต้องโหลด'",
-  "'ConZoL is newer - to download'"
- ],
- [
-  "'ในโฟลเดอร์ใหม่กว่า ConZoL'",
-  "'The folder is newer than ConZoL'"
- ],
- [
   "// ---- เขียนไฟล์ ----",
   "// ---- Write the workbook ----"
- ],
- [
-  "/ต้องโหลด/",
-  "/to download/"
  ],
  [
   "`รายการเสร็จ: โฟลเดอร์ ${fRows.length} ไฟล์ · ConZoL ${cRows.length} รายการ · ยังไม่ครบ ${need}`",
@@ -676,14 +652,6 @@
   "// Find the header row and return the column of each heading (rev/sts may repeat)"
  ],
  [
-  "// ---- ชีต MDR: หน้าตาเหมือน MDR ของโปรเจกต์ + ช่องสรุปผล ----",
-  "// ---- Sheet MDR: laid out like the project MDR, plus a Result column ----"
- ],
- [
-  "`  ชีต MDR: ${rows.length} รายการ (ตัดที่ยกเลิกออก ${mdrExcluded})`",
-  "`  MDR sheet: ${rows.length} rows (${mdrExcluded} cancelled row(s) left out)`"
- ],
- [
   "'· ยังไม่ได้เลือกไฟล์ MDR ในข้อ 2 — ข้ามชีต MDR'",
   "'· No MDR file chosen in step 2 - the MDR sheet is skipped'"
  ],
@@ -704,23 +672,87 @@
   "// Compare the revision the MDR records against the latest revision in ConZoL"
  ],
  [
-  "'MDR ยังไม่ลง Rev'",
-  "'MDR has no revision yet'"
- ],
- [
-  "'ConZoL ใหม่กว่า MDR'",
-  "'ConZoL is newer than the MDR'"
- ],
- [
-  "'MDR ใหม่กว่า ConZoL'",
-  "'MDR is newer than ConZoL'"
- ],
- [
-  "'คนละชุด Rev (T/R)'",
-  "'Different revision series (T/R)'"
- ],
- [
   "// T กับ R เทียบกันตรง ๆ ไม่ได้ ต้องให้คนดู",
   "// T and R cannot be compared directly - leave the call to a person"
+ ],
+ [
+  "// ค่าที่ลงในไฟล์ Excel เป็นภาษาอังกฤษเสมอ — MDR เป็นเอกสารภาษาอังกฤษ",
+  "// Values written into the workbook are always English - the MDR is an English document"
+ ],
+ [
+  "// แต่ละรอบการส่ง (1st / 2nd / 3rd Issue …) เริ่มที่คอลัมน์ Rev. ของรอบนั้น",
+  "// Each issue round (1st / 2nd / 3rd Issue …) starts at that round's Rev. column"
+ ],
+ [
+  "// ในหนึ่งรอบเรียงแบบนี้เสมอ:  Status · Rev. · Plan(T0) · Forecast · Actual · TR No.",
+  "// A round always runs:  Status · Rev. · Plan(T0) · Forecast · Actual · TR No."
+ ],
+ [
+  "//                              แล้วต่อด้วย Owner's Reply:  Status · Plan · Actual · TR No.",
+  "//                        followed by the Owner's Reply:  Status · Plan · Actual · TR No."
+ ],
+ [
+  "// ใช้ช่อง Status ของ Owner เป็นเส้นแบ่ง จะได้ไม่ต้องผูกกับหัวข้อกลุ่ม",
+  "// The owner's Status column is the divider, so no group heading has to be matched"
+ ],
+ [
+  "`  ชีต Revisions: ${rv.length} รอบการส่ง`",
+  "`  Revisions sheet: ${rv.length} issue round(s)`"
+ ],
+ [
+  "// ชื่อรอบการส่งใน MDR (1st Issue, 2nd Issue …)",
+  "// Names of the MDR's issue rounds (1st Issue, 2nd Issue …)"
+ ],
+ [
+  "// ข้อความที่เขียนลงไฟล์ Excel ใช้ภาษาอังกฤษเสมอ ทั้งเวอร์ชันไทยและอังกฤษ",
+  "// Text written into the Excel file is always English, in both the Thai and English builds"
+ ],
+ [
+  "// (เป็นเอกสารที่ส่งต่อให้ทีมและเจ้าของงาน ไม่ใช่หน้าจอ)",
+  "// (it is a document passed on to the team and the owner, not a screen)"
+ ],
+ [
+  "// ช่องของหนึ่งรอบการส่ง เรียงเหมือน MDR — ใช้ทั้งชีต MDR (แนวนอน) และชีต Revisions (แนวตั้ง)",
+  "// The fields of one issue round, ordered as in the MDR - used by the MDR sheet (across) and Revisions (down)"
+ ],
+ [
+  "// หัวตารางกินหลายบรรทัด — หยุดก่อนถึงแถวข้อมูลแถวแรก ไม่งั้นจะอ่านข้อมูลเป็นหัวตาราง",
+  "// The header spans several rows - stop before the first data row, or data reads as a heading"
+ ],
+ [
+  "// Plan(T0) แตกเป็น Start/Finish อีกบรรทัด หัวที่อ่านได้จึงเป็น START/FINISH เฉย ๆ",
+  "// Plan(T0) splits into Start/Finish on the next row, so the heading read back is just START/FINISH"
+ ],
+ [
+  "// ชื่อรอบ = หัวข้อใหญ่ + ชื่อบล็อก เช่น \"For Construction / For Final - 2nd Issue\"",
+  "// Round name = section + block, e.g. \"For Construction / For Final - 2nd Issue\""
+ ],
+ [
+  "// ชื่อรอบการส่งเก็บครั้งเดียว ใช้เป็นหัวตารางของชีต MDR",
+  "// The round names are captured once and become the MDR sheet's headings"
+ ],
+ [
+  "// hdrRow = แถวหัวตารางที่ติด filter (0 = แถวแรก) · merges = ช่องที่รวมกันบนหัวตาราง",
+  "// hdrRow = the header row the filter sits on (0 = first row) · merges = merged header cells"
+ ],
+ [
+  "// ---- ชีต MDR: หน้าตาเหมือน MDR ของโปรเจกต์ — ทุกรอบการส่งอยู่บรรทัดเดียวกัน ----",
+  "// ---- Sheet MDR: laid out like the project MDR - every issue round on the same row ----"
+ ],
+ [
+  "// หัวตาราง 2 บรรทัด: บรรทัดบน = ชื่อรอบ (รวมช่องเหมือน MDR) · บรรทัดล่าง = ชื่อช่อง",
+  "// A two-row header: the top row names the round (merged, as in the MDR), the second names the field"
+ ],
+ [
+  "// ชีตที่หัวตารางไม่เหมือนกัน ปล่อยว่างไว้ ดีกว่าเอาค่าไปใส่ผิดช่อง",
+  "// A sheet with a different header is left blank rather than risk values landing in the wrong column"
+ ],
+ [
+  "`  ชีต MDR: ${rows.length} รายการ · ${mdrRoundHdr.length} รอบการส่ง (ตัดที่ยกเลิกออก ${mdrExcluded})`",
+  "`  MDR sheet: ${rows.length} rows · ${mdrRoundHdr.length} issue rounds (${mdrExcluded} cancelled row(s) left out)`"
+ ],
+ [
+  "// ---- ชีต Revisions: หนึ่งบรรทัดต่อหนึ่งรอบการส่ง ไว้เรียง/กรองตามวันที่ ----",
+  "// ---- Sheet Revisions: one line per issue round, for sorting and filtering by date ----"
  ]
 ]

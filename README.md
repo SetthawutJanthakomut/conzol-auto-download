@@ -73,12 +73,19 @@ plan in Excel before committing to it.
 | **ConZoL** | every document ConZoL holds for the disciplines you asked for — revision, title, group, area, whether a native attachment exists, and the folder it belongs in |
 | **Compare** | the two sides side by side — *Up to date*, *ConZoL is newer - to download*, *Not in the folder yet - to download*, *Not found in ConZoL* |
 | **MDR** | your own MDR, refreshed — only when an MDR file is loaded in step 2 |
+| **Revisions** | one line per issue round, for sorting or filtering by date |
 
 The MDR sheet keeps the register's own columns (S/N, Document No., Title, Activity ID, Budget, Class,
-the latest Rev., Issue Status, Owner's Reply, Progress) and adds ConZoL's current revision beside them,
-plus **MDR vs ConZoL** (*Up to date* / *ConZoL is newer than the MDR* / *MDR is newer than ConZoL* /
-*Different revision series (T/R)*) and **Result**. Column positions are found from the header text, so a
-reordered MDR still reads correctly. Rows struck through or marked *Delete* are left out and named in the log.
+latest Rev., latest Issue Status, latest Owner's Reply, Progress), adds ConZoL's current revision,
+**MDR vs ConZoL** (*Same revision* / *ConZoL is newer than the MDR* / *MDR is newer than ConZoL* /
+*Different revision series (T/R)*) and **Result** — then carries **every issue round on the same row**,
+exactly as the MDR lays them out: for each round *Issue Status · Rev. · Plan Start · Plan Finish ·
+Forecast · Submitted · TR No. · Owner's Reply · Reply Due · Reply Received · Reply TR No.*, under a merged
+heading naming the round (`For Construction / For Final - 2nd Issue`).
+
+Everything is read from the header text, never from fixed column letters, so extra rounds, renamed
+sections or a reordered MDR all still read correctly. Rows struck through or marked *Delete* are left
+out and named in the log. Text written into the workbook is always English, in both language builds.
 
 Leave the discipline box empty for every discipline in ConZoL's dropdown, or type the ones you want
 (`MA-DWG, MA-CAL`). It reads like an MDR and opens straight in Excel.
@@ -213,12 +220,19 @@ chrome://extensions/?id=dhdgffkkebhmkfjojejmpbldmpobfkfo
 | **ConZoL** | เอกสารทุกตัวที่มีใน ConZoL ตาม discipline ที่เลือก — Rev, ชื่อเรื่อง, กลุ่ม, พื้นที่, มีไฟล์แนบไหม และโฟลเดอร์ที่ควรอยู่ |
 | **Compare** | เทียบสองฝั่ง — *Up to date*, *ConZoL ใหม่กว่า — ต้องโหลด*, *ยังไม่มีในโฟลเดอร์ — ต้องโหลด*, *ไม่พบใน ConZoL* |
 | **MDR** | MDR ของคุณเอง อัปเดตสถานะให้ — ขึ้นเฉพาะตอนโหลดไฟล์ MDR ในข้อ 2 แล้ว |
+| **Revisions** | หนึ่งบรรทัดต่อหนึ่งรอบการส่ง ไว้เรียงหรือกรองตามวันที่ |
 
 ชีต MDR เก็บคอลัมน์เดิมของ MDR ไว้ (S/N, Document No., Title, Activity ID, Budget, Class, Rev. ล่าสุด,
-Issue Status, Owner's Reply, Progress) แล้วต่อท้ายด้วย Rev ปัจจุบันใน ConZoL, **MDR vs ConZoL**
-(*ตรงกัน* / *ConZoL ใหม่กว่า MDR* / *MDR ใหม่กว่า ConZoL* / *คนละชุด Rev (T/R)*) และ **Result**
-ตำแหน่งคอลัมน์อ่านจากข้อความหัวตาราง สลับคอลัมน์ใน MDR ก็ยังอ่านได้ แถวที่ขีดฆ่าหรือเขียน *Delete*
-จะถูกตัดออกและแจ้งเลขเอกสารไว้ในบันทึกการทำงาน
+Issue Status ล่าสุด, Owner's Reply ล่าสุด, Progress) ต่อด้วย Rev ปัจจุบันใน ConZoL, **MDR vs ConZoL**
+(*Same revision* / *ConZoL is newer than the MDR* / *MDR is newer than ConZoL* /
+*Different revision series (T/R)*) และ **Result** แล้ววาง **ทุกรอบการส่งไว้บรรทัดเดียวกัน** เหมือน MDR เป๊ะ
+รอบละ *Issue Status · Rev. · Plan Start · Plan Finish · Forecast · Submitted · TR No. · Owner's Reply ·
+Reply Due · Reply Received · Reply TR No.* ใต้หัวตารางที่รวมช่องและบอกชื่อรอบ
+(`For Construction / For Final - 2nd Issue`)
+
+ทุกอย่างอ่านจากข้อความหัวตาราง ไม่ผูกกับตัวอักษรคอลัมน์ เพิ่มรอบการส่ง เปลี่ยนชื่อหัวข้อ หรือสลับคอลัมน์
+ก็ยังอ่านได้ถูก แถวที่ขีดฆ่าหรือเขียน *Delete* จะถูกตัดออกและแจ้งเลขเอกสารไว้ในบันทึกการทำงาน
+ข้อความที่เขียนลงไฟล์ Excel เป็นภาษาอังกฤษเสมอ ทั้งเวอร์ชันไทยและอังกฤษ
 
 ช่อง discipline เว้นว่าง = ไล่ทุกอย่างที่มีใน dropdown ของ ConZoL หรือพิมพ์เฉพาะที่ต้องการก็ได้
 (`MA-DWG, MA-CAL`) หน้าตาอ่านง่ายคล้าย MDR เปิดใน Excel ได้เลย
