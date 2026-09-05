@@ -112,10 +112,6 @@
   "// ============ Read the MDR file ============"
  ],
  [
-  "<legend>โฟลเดอร์ปลายทาง</legend>",
-  "<legend>Destination folder</legend>"
- ],
- [
   ">ยังไม่ได้เลือกโฟลเดอร์</div>",
   ">No folder chosen yet</div>"
  ],
@@ -172,10 +168,6 @@
   ">Search ConZoL + download all</button>"
  ],
  [
-  "<legend>ชนิดไฟล์ที่จะโหลด</legend>",
-  "<legend>What to download</legend>"
- ],
- [
   "> PDF (คอลัมน์ PDF+)</label>",
   "> PDF (PDF+ column)</label>"
  ],
@@ -206,10 +198,6 @@
  [
   ">บันทึกรายงาน CSV</button>",
   ">Save CSV report</button>"
- ],
- [
-  ">พร้อมทำงาน</div>",
-  ">Ready</div>"
  ],
  [
   "// ---- โฟลเดอร์ปลายทาง ----",
@@ -548,18 +536,6 @@
   "'— Check finished (nothing downloaded) — press \"Save CSV report\" to keep the list'"
  ],
  [
-  "<legend>3) ทำรายการเอกสารเป็น Excel</legend>",
-  "<legend>3) Document list (Excel)</legend>"
- ],
- [
-  "placeholder=\"เว้นว่าง = ทุกอย่าง · เช่น MA-DWG, MA-CAL\"",
-  "placeholder=\"blank = every discipline · e.g. MA-DWG, MA-CAL\""
- ],
- [
-  ">สร้างไฟล์รายการ (.xlsx)</button>",
-  ">Build list (.xlsx)</button>"
- ],
- [
   "// ============ โหมด 3 — ทำรายการเอกสารเป็น Excel ============",
   "// ============ Mode 3 - build a document list as Excel ============"
  ],
@@ -792,24 +768,8 @@
   "`  MDR sheet: ${rows.length} rows · ${mdrRoundHdr.length} issue rounds (${mdrExcluded} cancelled left out)`"
  ],
  [
-  ">เอาชีตไหนบ้าง:</div>",
-  ">Which sheets:</div>"
- ],
- [
-  " <b>MDR</b> — ทะเบียนของคุณ + สถานะล่าสุด (ต้องเลือกไฟล์ MDR ในข้อ 2)</label>",
-  " <b>MDR</b> - your register with its current status (needs the MDR file from step 2)</label>"
- ],
- [
-  " <b>ConZoL Revisions</b> — ทุก Rev จาก ConZoL · TR No. · วันที่ · Status</label>",
-  " <b>ConZoL Revisions</b> - every revision from ConZoL · TR No. · dates · status</label>"
- ],
- [
   " <b>Folder</b> — ไฟล์ที่มีอยู่ในโฟลเดอร์</label>",
   " <b>Folder</b> - the files already in your folder</label>"
- ],
- [
-  " <b>ConZoL</b> — เอกสารทั้งหมดใน ConZoL (Rev ล่าสุด)</label>",
-  " <b>ConZoL</b> - every document in ConZoL (latest revision)</label>"
  ],
  [
   " <b>Compare</b> — เทียบโฟลเดอร์กับ ConZoL</label>",
@@ -858,5 +818,73 @@
  [
   "` · ยังไม่ครบ ${need}`",
   "` · ${need} still to download`"
+ ],
+ [
+  "/* แถบแท็บ — กล่องเดิมยาวเกินจอ เลยแบ่งเป็นแท็บแล้วให้เนื้อในเลื่อนเอง */",
+  "/* Tab strip - the single column ran off the screen, so it is split into tabs that scroll */"
+ ],
+ [
+  "<button data-p=\"dl\" class=\"on\">โหลด</button>",
+  "<button data-p=\"dl\" class=\"on\">Download</button>"
+ ],
+ [
+  "<button data-p=\"list\">รายการ Excel</button>",
+  "<button data-p=\"list\">Excel list</button>"
+ ],
+ [
+  "<button data-p=\"folder\">โฟลเดอร์</button>",
+  "<button data-p=\"folder\">Folder</button>"
+ ],
+ [
+  "<button data-p=\"opt\">ตั้งค่า</button>",
+  "<button data-p=\"opt\">Options</button>"
+ ],
+ [
+  "<legend>ชีตที่จะเอา</legend>",
+  "<legend>Sheets to build</legend>"
+ ],
+ [
+  "<legend>ขอบเขต</legend>",
+  "<legend>Scope</legend>"
+ ],
+ [
+  " <b>MDR</b> — ทะเบียนของคุณ + สถานะล่าสุด</label>",
+  " <b>MDR</b> - your register with its current status</label>"
+ ],
+ [
+  " <b>ConZoL Revisions</b> — ทุก Rev · TR No. · วันที่ · Status</label>",
+  " <b>ConZoL Revisions</b> - every revision · TR No. · dates · status</label>"
+ ],
+ [
+  " <b>ConZoL</b> — เอกสารทั้งหมด (Rev ล่าสุด)</label>",
+  " <b>ConZoL</b> - every document (latest revision)</label>"
+ ],
+ [
+  "ชีต MDR ต้องเลือกไฟล์ MDR ในแท็บ “โหลด” ก่อน</div>",
+  "The MDR sheet needs an MDR file, loaded on the Download tab</div>"
+ ],
+ [
+  "placeholder=\"เว้นว่าง = ทุกอย่าง · เช่น MA-DWG\"",
+  "placeholder=\"blank = every discipline · e.g. MA-DWG\""
+ ],
+ [
+  ">สร้างไฟล์รายการ (.xlsx)</button>",
+  ">Build list (.xlsx)</button>"
+ ],
+ [
+  "<legend>ชนิดไฟล์ที่จะโหลด</legend>",
+  "<legend>What to download</legend>"
+ ],
+ [
+  "<legend>โฟลเดอร์ปลายทาง</legend>",
+  "<legend>Destination folder</legend>"
+ ],
+ [
+  "// แถบแท็บ — จำแท็บล่าสุดไว้ให้ด้วย",
+  "// Tab strip - the last tab used is remembered"
+ ],
+ [
+  ">พร้อมทำงาน</span>",
+  ">Ready</span>"
  ]
 ]

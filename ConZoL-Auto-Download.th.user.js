@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GULF ConZoL – Auto Download + Rename + Sort (MDR)
 // @namespace    gmtp.marine.jay
-// @version      5.3
+// @version      5.4
 // @description  ดาวน์โหลด PDF และไฟล์แนบ (FILE+) จาก ConZoL ลงโฟลเดอร์ที่เลือกไว้โดยตรง (ไม่ผ่าน Download ของ Chrome) ตั้งชื่อ <DocNo>-<Rev>_<Title>.pdf แยกโฟลเดอร์ตามหมวด ย้าย Rev เก่าเข้า _Superseded และอ่านรายการจากไฟล์ MDR ให้เอง
 // @author       JAY
 // @match        https://edms.gulf.co.th/dms/drawing.asp*
@@ -20,7 +20,7 @@
   // ถ้ามีกล่องอยู่แล้ว ให้ชุดที่มาทีหลังหยุดทำงาน ไม่งั้น id จะซ้ำและปุ่มจะกดไม่ติด
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '5.3';   // ซิงก์อัตโนมัติจาก @version ตอน build
+  const VERSION = '5.4';   // ซิงก์อัตโนมัติจาก @version ตอน build
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.th.user.js';   // build.py ใส่ให้ตามภาษา
 
   // ---------------- ตั้งค่าได้ตรงนี้ ----------------
@@ -576,57 +576,92 @@
       #edmsdl .x{cursor:pointer;font-weight:normal}
       #edmsdl .ver{font:9px Tahoma;font-weight:normal;opacity:.65;margin-left:5px;letter-spacing:.3px}
       #edmsdl .ver.new{opacity:1;background:#d9822b;color:#fff;padding:1px 6px;border-radius:9px;cursor:pointer}
+      /* แถบแท็บ — กล่องเดิมยาวเกินจอ เลยแบ่งเป็นแท็บแล้วให้เนื้อในเลื่อนเอง */
+      #edmsdl{display:flex;flex-direction:column;max-height:calc(100vh - 20px)}
+      #edmsdl .bd{overflow:auto;flex:1 1 auto;min-height:0}
+      #edmsdl .tabs{display:flex;background:#efeae0;border-bottom:1px solid #cfc5b4;flex:0 0 auto}
+      #edmsdl .tabs button{flex:1;margin:0;border:0;border-right:1px solid #dcd4c4;border-radius:0;
+        background:transparent;padding:6px 2px;color:#6b5b43;font:11px Tahoma}
+      #edmsdl .tabs button:last-child{border-right:0}
+      #edmsdl .tabs button.on{background:#fff;font-weight:bold;color:#3b3020;box-shadow:inset 0 -2px 0 #7a6a52}
+      #edmsdl .pane{display:none}
+      #edmsdl .pane.on{display:block}
+      #edmsdl .foot{flex:0 0 auto;border-top:1px solid #ddd;padding:6px 9px;background:#faf8f4;
+        border-radius:0 0 7px 7px}
+      #edmsdl .log{max-height:150px}
+      #edmsdl fieldset:first-child{margin-top:0}
+      #edmsdl .hint{color:#888;margin:0 0 5px}
+      #edmsdl .dirbar{flex:0 0 auto;padding:4px 9px;background:#f7f4ee;border-bottom:1px solid #e3dbcc;
+        font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     </style>
     <div class="hd"><span>⬇ ConZoL Auto Download <span class="ver" id="edl-ver">v${VERSION}</span></span><span class="x" id="edl-min">–</span></div>
+    <div class="tabs" id="edl-tabs">
+      <button data-p="dl" class="on">โหลด</button>
+      <button data-p="list">รายการ Excel</button>
+      <button data-p="folder">โฟลเดอร์</button>
+      <button data-p="opt">ตั้งค่า</button>
+    </div>
+    <div class="dirbar" id="edl-dirinfo">ยังไม่ได้เลือกโฟลเดอร์</div>
     <div class="bd" id="edl-body">
 
-      <fieldset><legend>โฟลเดอร์ปลายทาง</legend>
-        <div id="edl-dirinfo" class="wn">ยังไม่ได้เลือกโฟลเดอร์</div>
-        <button class="pick" id="edl-pick">เลือกโฟลเดอร์…</button>
-        <button id="edl-rescan">สแกนใหม่</button>
-        <button id="edl-tidy">จัดโฟลเดอร์ใหม่</button>
-      </fieldset>
+      <div class="pane on" data-p="dl">
+        <fieldset><legend>1) จากหน้าผลค้นหาปัจจุบัน</legend>
+          <label><input type="checkbox" id="edl-checked"> เฉพาะแถวที่ติ๊ก checkbox</label>
+          <button class="chk" id="edl-check">เช็คก่อน (ไม่โหลดจริง)</button>
+          <button class="go" id="edl-run">โหลดจากหน้านี้</button>
+        </fieldset>
 
-      <fieldset><legend>1) จากหน้าผลค้นหาปัจจุบัน</legend>
-        <label><input type="checkbox" id="edl-checked"> เฉพาะแถวที่ติ๊ก checkbox</label>
-        <button class="chk" id="edl-check">เช็คก่อน (ไม่โหลดจริง)</button>
-        <button class="go" id="edl-run">โหลดจากหน้านี้</button>
-      </fieldset>
+        <fieldset><legend>2) จากไฟล์ MDR (อัตโนมัติ)</legend>
+          <input type="file" id="edl-file" accept=".xlsx,.xlsm,.csv,.txt">
+          <div style="margin-top:4px">ชีต: <select id="edl-sheet"><option value="*">— เลือกไฟล์ก่อน —</option></select></div>
+          <div id="edl-mdrinfo" class="sk" style="margin-top:3px">ยังไม่ได้โหลดรายการ</div>
+          <div style="margin-top:4px">ไม่เอาเอกสารเหล่านี้:</div>
+          <textarea id="edl-exclude" rows="2" style="width:100%;font:10px Consolas,monospace" placeholder="เช่น GMTP-MA-RPT-012"></textarea>
+          <button class="chk" id="edl-checkmdr">เช็คก่อน (ไม่โหลดจริง)</button>
+          <button class="go2" id="edl-runmdr">ค้น ConZoL + โหลดทั้งหมด</button>
+        </fieldset>
 
-      <fieldset><legend>2) จากไฟล์ MDR (อัตโนมัติ)</legend>
-        <input type="file" id="edl-file" accept=".xlsx,.xlsm,.csv,.txt">
-        <div style="margin-top:4px">ชีต: <select id="edl-sheet"><option value="*">— เลือกไฟล์ก่อน —</option></select></div>
-        <div id="edl-mdrinfo" class="sk" style="margin-top:3px">ยังไม่ได้โหลดรายการ</div>
-        <div style="margin-top:4px">ไม่เอาเอกสารเหล่านี้:</div>
-        <textarea id="edl-exclude" rows="2" style="width:100%;font:10px Consolas,monospace" placeholder="เช่น GMTP-MA-RPT-012"></textarea>
-        <button class="chk" id="edl-checkmdr">เช็คก่อน (ไม่โหลดจริง)</button>
-        <button class="go2" id="edl-runmdr">ค้น ConZoL + โหลดทั้งหมด</button>
-      </fieldset>
+        <fieldset><legend>ชนิดไฟล์ที่จะโหลด</legend>
+          <label><input type="checkbox" id="edl-getpdf" checked> PDF (คอลัมน์ PDF+)</label>
+          <label><input type="checkbox" id="edl-getfile"> ไฟล์แนบต้นฉบับ (คอลัมน์ FILE+ · .zip)</label>
+        </fieldset>
+      </div>
 
-      <fieldset><legend>3) ทำรายการเอกสารเป็น Excel</legend>
-        <div>discipline: <input id="edl-listdisc" style="width:210px;font:10px Consolas,monospace" placeholder="เว้นว่าง = ทุกอย่าง · เช่น MA-DWG, MA-CAL"></div>
-        <div style="margin-top:5px">เอาชีตไหนบ้าง:</div>
-        <label><input type="checkbox" id="edl-sh-mdr" checked> <b>MDR</b> — ทะเบียนของคุณ + สถานะล่าสุด (ต้องเลือกไฟล์ MDR ในข้อ 2)</label>
-        <label><input type="checkbox" id="edl-sh-rev" checked> <b>ConZoL Revisions</b> — ทุก Rev จาก ConZoL · TR No. · วันที่ · Status</label>
-        <label><input type="checkbox" id="edl-sh-folder" checked> <b>Folder</b> — ไฟล์ที่มีอยู่ในโฟลเดอร์</label>
-        <label><input type="checkbox" id="edl-sh-conzol" checked> <b>ConZoL</b> — เอกสารทั้งหมดใน ConZoL (Rev ล่าสุด)</label>
-        <label><input type="checkbox" id="edl-sh-cmp" checked> <b>Compare</b> — เทียบโฟลเดอร์กับ ConZoL</label>
-        <button class="chk" id="edl-list">สร้างไฟล์รายการ (.xlsx)</button>
-      </fieldset>
+      <div class="pane" data-p="list">
+        <fieldset><legend>ชีตที่จะเอา</legend>
+          <label><input type="checkbox" id="edl-sh-mdr" checked> <b>MDR</b> — ทะเบียนของคุณ + สถานะล่าสุด</label>
+          <label><input type="checkbox" id="edl-sh-rev" checked> <b>ConZoL Revisions</b> — ทุก Rev · TR No. · วันที่ · Status</label>
+          <label><input type="checkbox" id="edl-sh-folder" checked> <b>Folder</b> — ไฟล์ที่มีอยู่ในโฟลเดอร์</label>
+          <label><input type="checkbox" id="edl-sh-conzol" checked> <b>ConZoL</b> — เอกสารทั้งหมด (Rev ล่าสุด)</label>
+          <label><input type="checkbox" id="edl-sh-cmp" checked> <b>Compare</b> — เทียบโฟลเดอร์กับ ConZoL</label>
+          <div class="hint" style="margin-top:5px">ชีต MDR ต้องเลือกไฟล์ MDR ในแท็บ “โหลด” ก่อน</div>
+        </fieldset>
+        <fieldset><legend>ขอบเขต</legend>
+          <div>discipline: <input id="edl-listdisc" style="width:200px;font:10px Consolas,monospace" placeholder="เว้นว่าง = ทุกอย่าง · เช่น MA-DWG"></div>
+        </fieldset>
+        <button class="go2" id="edl-list">สร้างไฟล์รายการ (.xlsx)</button>
+      </div>
 
-      <fieldset style="margin-top:2px"><legend>ชนิดไฟล์ที่จะโหลด</legend>
-        <label><input type="checkbox" id="edl-getpdf" checked> PDF (คอลัมน์ PDF+)</label>
-        <label><input type="checkbox" id="edl-getfile"> ไฟล์แนบต้นฉบับ (คอลัมน์ FILE+ · .zip)</label>
-      </fieldset>
-      <label><input type="checkbox" id="edl-skip" checked> ข้ามไฟล์ที่มีอยู่ในโฟลเดอร์แล้ว</label>
-      <label><input type="checkbox" id="edl-sup" checked> ย้าย Rev เก่าเข้า _Superseded</label>
-      <label><input type="checkbox" id="edl-area" checked> แยกโฟลเดอร์ย่อยตามพื้นที่ (1400 / 0500 / PCC …)</label>
-      <label><input type="checkbox" id="edl-inactive"> ค้นรวมเอกสารที่ไม่ Active</label>
-      <div>
-        <button class="stop" id="edl-stop">หยุด</button>
+      <div class="pane" data-p="folder">
+        <fieldset><legend>โฟลเดอร์ปลายทาง</legend>
+          <button class="pick" id="edl-pick">เลือกโฟลเดอร์…</button>
+          <button id="edl-rescan">สแกนใหม่</button>
+          <button id="edl-tidy">จัดโฟลเดอร์ใหม่</button>
+        </fieldset>
+      </div>
+
+      <div class="pane" data-p="opt">
+        <label><input type="checkbox" id="edl-skip" checked> ข้ามไฟล์ที่มีอยู่ในโฟลเดอร์แล้ว</label>
+        <label><input type="checkbox" id="edl-sup" checked> ย้าย Rev เก่าเข้า _Superseded</label>
+        <label><input type="checkbox" id="edl-area" checked> แยกโฟลเดอร์ย่อยตามพื้นที่ (1400 / 0500 / PCC …)</label>
+        <label><input type="checkbox" id="edl-inactive"> ค้นรวมเอกสารที่ไม่ Active</label>
         <button id="edl-csv">บันทึกรายงาน CSV</button>
       </div>
-      <div class="st" id="edl-status">พร้อมทำงาน</div>
+
+    </div>
+    <div class="foot">
+      <button class="stop" id="edl-stop">หยุด</button>
+      <span class="st" id="edl-status" style="margin-left:6px">พร้อมทำงาน</span>
       <div class="log" id="edl-log"></div>
     </div>`;
   document.body.appendChild(box);
@@ -635,7 +670,20 @@
   const logEl = el('edl-log'), statusEl = el('edl-status');
   const log = (m, c) => { logEl.appendChild($('div', { className: c || '', textContent: m })); logEl.scrollTop = logEl.scrollHeight; };
 
-  el('edl-min').onclick = () => { const b = el('edl-body'); b.style.display = b.style.display === 'none' ? '' : 'none'; };
+  el('edl-min').onclick = () => {
+    const hide = box.querySelector('.bd').style.display !== 'none';
+    box.querySelectorAll('.bd,.tabs,.foot,.dirbar').forEach((n) => { n.style.display = hide ? 'none' : ''; });
+  };
+
+  // แถบแท็บ — จำแท็บล่าสุดไว้ให้ด้วย
+  const TAB_KEY = 'edms_tab_v1';
+  function showTab(p) {
+    box.querySelectorAll('.tabs button').forEach((b) => b.classList.toggle('on', b.dataset.p === p));
+    box.querySelectorAll('.pane').forEach((n) => n.classList.toggle('on', n.dataset.p === p));
+    try { localStorage.setItem(TAB_KEY, p); } catch (e) {}
+  }
+  box.querySelectorAll('.tabs button').forEach((b) => { b.onclick = () => showTab(b.dataset.p); });
+  try { const t = localStorage.getItem(TAB_KEY); if (t && box.querySelector('.pane[data-p="' + t + '"]')) showTab(t); } catch (e) {}
 
   (() => {
     const hd = box.querySelector('.hd');
@@ -658,12 +706,12 @@
   function showDirInfo(extra) {
     const d = el('edl-dirinfo');
     if (!rootDir) {
-      d.className = 'wn';
+      d.className = 'dirbar wn';
       d.textContent = FSA ? 'ยังไม่ได้เลือกโฟลเดอร์ (จะเซฟลง Downloads แทน)'
                           : 'เบราว์เซอร์นี้ไม่รองรับ — จะเซฟลง Downloads';
       return;
     }
-    d.className = 'ok';
+    d.className = 'dirbar ok';
     let n = 0; existing.forEach((v) => { n += v.length; });
     d.textContent = `📁 ${rootDir.name} · มีไฟล์อยู่แล้ว ${n}` + (extra ? ' · ' + extra : '');
   }

@@ -53,8 +53,10 @@ No auto-update on this route.
 
 ## Use
 
-1. Open `https://edms.gulf.co.th/dms/drawing.asp` and log in — a panel appears top right
-2. **Choose folder…** → pick where documents go (asked once, remembered)
+1. Open `https://edms.gulf.co.th/dms/drawing.asp` and log in — a panel appears top right, in four
+   tabs: **Download**, **Excel list**, **Folder**, **Options**. The destination folder shows in a strip
+   under the tabs, and the stop button, status line and log stay visible whichever tab you are on.
+2. **Folder → Choose folder…** → pick where documents go (asked once, remembered)
 3. Tick what you want: **PDF** (PDF+ column) and/or **Native attachment** (FILE+ column, `.zip`)
 4. Then either
    - run a SEARCH and press **Download this page**, or
@@ -213,8 +215,10 @@ chrome://extensions/?id=dhdgffkkebhmkfjojejmpbldmpobfkfo
 
 ## วิธีใช้
 
-1. เปิด `https://edms.gulf.co.th/dms/drawing.asp` แล้วล็อกอิน — กล่องจะโผล่มุมขวาบน
-2. กด **เลือกโฟลเดอร์…** ชี้ที่เก็บเอกสาร (ถามครั้งเดียว จำไว้ให้)
+1. เปิด `https://edms.gulf.co.th/dms/drawing.asp` แล้วล็อกอิน — กล่องจะโผล่มุมขวาบน แบ่งเป็น 4 แถบ
+   **โหลด** · **รายการ Excel** · **โฟลเดอร์** · **ตั้งค่า** โฟลเดอร์ปลายทางขึ้นเป็นแถบใต้แท็บ
+   ส่วนปุ่มหยุด สถานะ และบันทึกการทำงาน เห็นตลอดไม่ว่าอยู่แท็บไหน
+2. แท็บ **โฟลเดอร์** → กด **เลือกโฟลเดอร์…** ชี้ที่เก็บเอกสาร (ถามครั้งเดียว จำไว้ให้)
 3. ติ๊กชนิดไฟล์: **PDF** (คอลัมน์ PDF+) และ/หรือ **ไฟล์แนบต้นฉบับ** (คอลัมน์ FILE+ · `.zip`)
 4. เลือกวิธีโหลด
    - กด SEARCH ตามปกติ แล้วกด **โหลดจากหน้านี้** หรือ

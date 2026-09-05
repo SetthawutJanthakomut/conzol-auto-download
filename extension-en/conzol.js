@@ -6,7 +6,7 @@
   // If a panel already exists the later copy stops here - otherwise ids collide and buttons stop responding
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '5.3';   // kept in sync with @version at build time
+  const VERSION = '5.4';   // kept in sync with @version at build time
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.user.js';   // filled in per language at build time
 
   // ---------------- Settings ----------------
@@ -579,57 +579,92 @@
       #edmsdl .x{cursor:pointer;font-weight:normal}
       #edmsdl .ver{font:9px Tahoma;font-weight:normal;opacity:.65;margin-left:5px;letter-spacing:.3px}
       #edmsdl .ver.new{opacity:1;background:#d9822b;color:#fff;padding:1px 6px;border-radius:9px;cursor:pointer}
+      /* Tab strip - the single column ran off the screen, so it is split into tabs that scroll */
+      #edmsdl{display:flex;flex-direction:column;max-height:calc(100vh - 20px)}
+      #edmsdl .bd{overflow:auto;flex:1 1 auto;min-height:0}
+      #edmsdl .tabs{display:flex;background:#efeae0;border-bottom:1px solid #cfc5b4;flex:0 0 auto}
+      #edmsdl .tabs button{flex:1;margin:0;border:0;border-right:1px solid #dcd4c4;border-radius:0;
+        background:transparent;padding:6px 2px;color:#6b5b43;font:11px Tahoma}
+      #edmsdl .tabs button:last-child{border-right:0}
+      #edmsdl .tabs button.on{background:#fff;font-weight:bold;color:#3b3020;box-shadow:inset 0 -2px 0 #7a6a52}
+      #edmsdl .pane{display:none}
+      #edmsdl .pane.on{display:block}
+      #edmsdl .foot{flex:0 0 auto;border-top:1px solid #ddd;padding:6px 9px;background:#faf8f4;
+        border-radius:0 0 7px 7px}
+      #edmsdl .log{max-height:150px}
+      #edmsdl fieldset:first-child{margin-top:0}
+      #edmsdl .hint{color:#888;margin:0 0 5px}
+      #edmsdl .dirbar{flex:0 0 auto;padding:4px 9px;background:#f7f4ee;border-bottom:1px solid #e3dbcc;
+        font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     </style>
     <div class="hd"><span>⬇ ConZoL Auto Download <span class="ver" id="edl-ver">v${VERSION}</span></span><span class="x" id="edl-min">–</span></div>
+    <div class="tabs" id="edl-tabs">
+      <button data-p="dl" class="on">Download</button>
+      <button data-p="list">Excel list</button>
+      <button data-p="folder">Folder</button>
+      <button data-p="opt">Options</button>
+    </div>
+    <div class="dirbar" id="edl-dirinfo">No folder chosen yet</div>
     <div class="bd" id="edl-body">
 
-      <fieldset><legend>Destination folder</legend>
-        <div id="edl-dirinfo" class="wn">No folder chosen yet</div>
-        <button class="pick" id="edl-pick">Choose folder…</button>
-        <button id="edl-rescan">Rescan</button>
-        <button id="edl-tidy">Re-sort folders</button>
-      </fieldset>
+      <div class="pane on" data-p="dl">
+        <fieldset><legend>1) From the current search results</legend>
+          <label><input type="checkbox" id="edl-checked"> Only ticked rows</label>
+          <button class="chk" id="edl-check">Check first (no download)</button>
+          <button class="go" id="edl-run">Download this page</button>
+        </fieldset>
 
-      <fieldset><legend>1) From the current search results</legend>
-        <label><input type="checkbox" id="edl-checked"> Only ticked rows</label>
-        <button class="chk" id="edl-check">Check first (no download)</button>
-        <button class="go" id="edl-run">Download this page</button>
-      </fieldset>
+        <fieldset><legend>2) From an MDR file (automatic)</legend>
+          <input type="file" id="edl-file" accept=".xlsx,.xlsm,.csv,.txt">
+          <div style="margin-top:4px">Sheet: <select id="edl-sheet"><option value="*">— choose a file first —</option></select></div>
+          <div id="edl-mdrinfo" class="sk" style="margin-top:3px">No list loaded</div>
+          <div style="margin-top:4px">Exclude these documents:</div>
+          <textarea id="edl-exclude" rows="2" style="width:100%;font:10px Consolas,monospace" placeholder="e.g. GMTP-MA-RPT-012"></textarea>
+          <button class="chk" id="edl-checkmdr">Check first (no download)</button>
+          <button class="go2" id="edl-runmdr">Search ConZoL + download all</button>
+        </fieldset>
 
-      <fieldset><legend>2) From an MDR file (automatic)</legend>
-        <input type="file" id="edl-file" accept=".xlsx,.xlsm,.csv,.txt">
-        <div style="margin-top:4px">Sheet: <select id="edl-sheet"><option value="*">— choose a file first —</option></select></div>
-        <div id="edl-mdrinfo" class="sk" style="margin-top:3px">No list loaded</div>
-        <div style="margin-top:4px">Exclude these documents:</div>
-        <textarea id="edl-exclude" rows="2" style="width:100%;font:10px Consolas,monospace" placeholder="e.g. GMTP-MA-RPT-012"></textarea>
-        <button class="chk" id="edl-checkmdr">Check first (no download)</button>
-        <button class="go2" id="edl-runmdr">Search ConZoL + download all</button>
-      </fieldset>
+        <fieldset><legend>What to download</legend>
+          <label><input type="checkbox" id="edl-getpdf" checked> PDF (PDF+ column)</label>
+          <label><input type="checkbox" id="edl-getfile"> Native attachment (FILE+ column · .zip)</label>
+        </fieldset>
+      </div>
 
-      <fieldset><legend>3) Document list (Excel)</legend>
-        <div>discipline: <input id="edl-listdisc" style="width:210px;font:10px Consolas,monospace" placeholder="blank = every discipline · e.g. MA-DWG, MA-CAL"></div>
-        <div style="margin-top:5px">Which sheets:</div>
-        <label><input type="checkbox" id="edl-sh-mdr" checked> <b>MDR</b> - your register with its current status (needs the MDR file from step 2)</label>
-        <label><input type="checkbox" id="edl-sh-rev" checked> <b>ConZoL Revisions</b> - every revision from ConZoL · TR No. · dates · status</label>
-        <label><input type="checkbox" id="edl-sh-folder" checked> <b>Folder</b> - the files already in your folder</label>
-        <label><input type="checkbox" id="edl-sh-conzol" checked> <b>ConZoL</b> - every document in ConZoL (latest revision)</label>
-        <label><input type="checkbox" id="edl-sh-cmp" checked> <b>Compare</b> - your folder against ConZoL</label>
-        <button class="chk" id="edl-list">Build list (.xlsx)</button>
-      </fieldset>
+      <div class="pane" data-p="list">
+        <fieldset><legend>Sheets to build</legend>
+          <label><input type="checkbox" id="edl-sh-mdr" checked> <b>MDR</b> - your register with its current status</label>
+          <label><input type="checkbox" id="edl-sh-rev" checked> <b>ConZoL Revisions</b> - every revision · TR No. · dates · status</label>
+          <label><input type="checkbox" id="edl-sh-folder" checked> <b>Folder</b> - the files already in your folder</label>
+          <label><input type="checkbox" id="edl-sh-conzol" checked> <b>ConZoL</b> - every document (latest revision)</label>
+          <label><input type="checkbox" id="edl-sh-cmp" checked> <b>Compare</b> - your folder against ConZoL</label>
+          <div class="hint" style="margin-top:5px">The MDR sheet needs an MDR file, loaded on the Download tab</div>
+        </fieldset>
+        <fieldset><legend>Scope</legend>
+          <div>discipline: <input id="edl-listdisc" style="width:200px;font:10px Consolas,monospace" placeholder="blank = every discipline · e.g. MA-DWG"></div>
+        </fieldset>
+        <button class="go2" id="edl-list">Build list (.xlsx)</button>
+      </div>
 
-      <fieldset style="margin-top:2px"><legend>What to download</legend>
-        <label><input type="checkbox" id="edl-getpdf" checked> PDF (PDF+ column)</label>
-        <label><input type="checkbox" id="edl-getfile"> Native attachment (FILE+ column · .zip)</label>
-      </fieldset>
-      <label><input type="checkbox" id="edl-skip" checked> Skip files already in the folder</label>
-      <label><input type="checkbox" id="edl-sup" checked> Move superseded revisions to _Superseded</label>
-      <label><input type="checkbox" id="edl-area" checked> Sub-folder per area code (1400 / 0500 / PCC …)</label>
-      <label><input type="checkbox" id="edl-inactive"> Include non-active documents in search</label>
-      <div>
-        <button class="stop" id="edl-stop">Stop</button>
+      <div class="pane" data-p="folder">
+        <fieldset><legend>Destination folder</legend>
+          <button class="pick" id="edl-pick">Choose folder…</button>
+          <button id="edl-rescan">Rescan</button>
+          <button id="edl-tidy">Re-sort folders</button>
+        </fieldset>
+      </div>
+
+      <div class="pane" data-p="opt">
+        <label><input type="checkbox" id="edl-skip" checked> Skip files already in the folder</label>
+        <label><input type="checkbox" id="edl-sup" checked> Move superseded revisions to _Superseded</label>
+        <label><input type="checkbox" id="edl-area" checked> Sub-folder per area code (1400 / 0500 / PCC …)</label>
+        <label><input type="checkbox" id="edl-inactive"> Include non-active documents in search</label>
         <button id="edl-csv">Save CSV report</button>
       </div>
-      <div class="st" id="edl-status">Ready</div>
+
+    </div>
+    <div class="foot">
+      <button class="stop" id="edl-stop">Stop</button>
+      <span class="st" id="edl-status" style="margin-left:6px">Ready</span>
       <div class="log" id="edl-log"></div>
     </div>`;
   document.body.appendChild(box);
@@ -638,7 +673,20 @@
   const logEl = el('edl-log'), statusEl = el('edl-status');
   const log = (m, c) => { logEl.appendChild($('div', { className: c || '', textContent: m })); logEl.scrollTop = logEl.scrollHeight; };
 
-  el('edl-min').onclick = () => { const b = el('edl-body'); b.style.display = b.style.display === 'none' ? '' : 'none'; };
+  el('edl-min').onclick = () => {
+    const hide = box.querySelector('.bd').style.display !== 'none';
+    box.querySelectorAll('.bd,.tabs,.foot,.dirbar').forEach((n) => { n.style.display = hide ? 'none' : ''; });
+  };
+
+  // Tab strip - the last tab used is remembered
+  const TAB_KEY = 'edms_tab_v1';
+  function showTab(p) {
+    box.querySelectorAll('.tabs button').forEach((b) => b.classList.toggle('on', b.dataset.p === p));
+    box.querySelectorAll('.pane').forEach((n) => n.classList.toggle('on', n.dataset.p === p));
+    try { localStorage.setItem(TAB_KEY, p); } catch (e) {}
+  }
+  box.querySelectorAll('.tabs button').forEach((b) => { b.onclick = () => showTab(b.dataset.p); });
+  try { const t = localStorage.getItem(TAB_KEY); if (t && box.querySelector('.pane[data-p="' + t + '"]')) showTab(t); } catch (e) {}
 
   (() => {
     const hd = box.querySelector('.hd');
@@ -661,12 +709,12 @@
   function showDirInfo(extra) {
     const d = el('edl-dirinfo');
     if (!rootDir) {
-      d.className = 'wn';
+      d.className = 'dirbar wn';
       d.textContent = FSA ? 'No folder chosen - files will go to Downloads'
                           : 'Browser not supported - files will go to Downloads';
       return;
     }
-    d.className = 'ok';
+    d.className = 'dirbar ok';
     let n = 0; existing.forEach((v) => { n += v.length; });
     d.textContent = `📁 ${rootDir.name} · ${n} file(s) already here` + (extra ? ' · ' + extra : '');
   }
