@@ -72,6 +72,13 @@ plan in Excel before committing to it.
 | **Folder** | every document file on disk — document no., revision, title, file name, type, folder, Current/Superseded, size, date |
 | **ConZoL** | every document ConZoL holds for the disciplines you asked for — revision, title, group, area, whether a native attachment exists, and the folder it belongs in |
 | **Compare** | the two sides side by side — *Up to date*, *ConZoL is newer - to download*, *Not in the folder yet - to download*, *Not found in ConZoL* |
+| **MDR** | your own MDR, refreshed — only when an MDR file is loaded in step 2 |
+
+The MDR sheet keeps the register's own columns (S/N, Document No., Title, Activity ID, Budget, Class,
+the latest Rev., Issue Status, Owner's Reply, Progress) and adds ConZoL's current revision beside them,
+plus **MDR vs ConZoL** (*Up to date* / *ConZoL is newer than the MDR* / *MDR is newer than ConZoL* /
+*Different revision series (T/R)*) and **Result**. Column positions are found from the header text, so a
+reordered MDR still reads correctly. Rows struck through or marked *Delete* are left out and named in the log.
 
 Leave the discipline box empty for every discipline in ConZoL's dropdown, or type the ones you want
 (`MA-DWG, MA-CAL`). It reads like an MDR and opens straight in Excel.
@@ -205,6 +212,13 @@ chrome://extensions/?id=dhdgffkkebhmkfjojejmpbldmpobfkfo
 | **Folder** | ไฟล์ทุกไฟล์ที่มีอยู่ในโฟลเดอร์ — เลขเอกสาร, Rev, ชื่อเรื่อง, ชื่อไฟล์, ชนิด, โฟลเดอร์, Current/Superseded, ขนาด, วันที่ |
 | **ConZoL** | เอกสารทุกตัวที่มีใน ConZoL ตาม discipline ที่เลือก — Rev, ชื่อเรื่อง, กลุ่ม, พื้นที่, มีไฟล์แนบไหม และโฟลเดอร์ที่ควรอยู่ |
 | **Compare** | เทียบสองฝั่ง — *Up to date*, *ConZoL ใหม่กว่า — ต้องโหลด*, *ยังไม่มีในโฟลเดอร์ — ต้องโหลด*, *ไม่พบใน ConZoL* |
+| **MDR** | MDR ของคุณเอง อัปเดตสถานะให้ — ขึ้นเฉพาะตอนโหลดไฟล์ MDR ในข้อ 2 แล้ว |
+
+ชีต MDR เก็บคอลัมน์เดิมของ MDR ไว้ (S/N, Document No., Title, Activity ID, Budget, Class, Rev. ล่าสุด,
+Issue Status, Owner's Reply, Progress) แล้วต่อท้ายด้วย Rev ปัจจุบันใน ConZoL, **MDR vs ConZoL**
+(*ตรงกัน* / *ConZoL ใหม่กว่า MDR* / *MDR ใหม่กว่า ConZoL* / *คนละชุด Rev (T/R)*) และ **Result**
+ตำแหน่งคอลัมน์อ่านจากข้อความหัวตาราง สลับคอลัมน์ใน MDR ก็ยังอ่านได้ แถวที่ขีดฆ่าหรือเขียน *Delete*
+จะถูกตัดออกและแจ้งเลขเอกสารไว้ในบันทึกการทำงาน
 
 ช่อง discipline เว้นว่าง = ไล่ทุกอย่างที่มีใน dropdown ของ ConZoL หรือพิมพ์เฉพาะที่ต้องการก็ได้
 (`MA-DWG, MA-CAL`) หน้าตาอ่านง่ายคล้าย MDR เปิดใน Excel ได้เลย

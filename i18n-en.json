@@ -662,5 +662,65 @@
  [
   "'ทำรายการไม่สำเร็จ'",
   "'Could not build the list'"
+ ],
+ [
+  "// หัวตารางของ MDR — ใช้หาว่าคอลัมน์ไหนคืออะไร จะได้ไม่ต้องผูกกับตำแหน่ง A/B/C",
+  "// MDR column headings - used to locate each column, so nothing is tied to A/B/C"
+ ],
+ [
+  "// มีหลายชุด — เอาช่องขวาสุดที่มีค่า",
+  "// several rounds - take the right-most cell that has a value"
+ ],
+ [
+  "// หาหัวตาราง แล้วคืนตำแหน่งคอลัมน์ของแต่ละหัวข้อ (rev/sts เก็บได้หลายช่อง)",
+  "// Find the header row and return the column of each heading (rev/sts may repeat)"
+ ],
+ [
+  "// ---- ชีต MDR: หน้าตาเหมือน MDR ของโปรเจกต์ + ช่องสรุปผล ----",
+  "// ---- Sheet MDR: laid out like the project MDR, plus a Result column ----"
+ ],
+ [
+  "`  ชีต MDR: ${rows.length} รายการ (ตัดที่ยกเลิกออก ${mdrExcluded})`",
+  "`  MDR sheet: ${rows.length} rows (${mdrExcluded} cancelled row(s) left out)`"
+ ],
+ [
+  "'· ยังไม่ได้เลือกไฟล์ MDR ในข้อ 2 — ข้ามชีต MDR'",
+  "'· No MDR file chosen in step 2 - the MDR sheet is skipped'"
+ ],
+ [
+  "// ช่อง Status ที่ติดกับ Rev. คือสถานะตอนส่งออก ที่เหลือคือผลตอบกลับของ Owner",
+  "// A Status column next to a Rev. column is the issue status; the rest are the owner's reply"
+ ],
+ [
+  "log('    ยกเลิกใน MDR: ' + mdrDropped.join(', '), 'sk');",
+  "log('    cancelled in the MDR: ' + mdrDropped.join(', '), 'sk');"
+ ],
+ [
+  "// หัว Rev./Status กระจายอยู่หลายบรรทัด — เรียงตามคอลัมน์ก่อน จะได้หยิบช่องขวาสุดถูก",
+  "// Rev./Status headings sit on several rows - sort by column so the right-most cell wins"
+ ],
+ [
+  "// เทียบ Rev ที่ MDR บันทึกไว้ กับ Rev ล่าสุดใน ConZoL",
+  "// Compare the revision the MDR records against the latest revision in ConZoL"
+ ],
+ [
+  "'MDR ยังไม่ลง Rev'",
+  "'MDR has no revision yet'"
+ ],
+ [
+  "'ConZoL ใหม่กว่า MDR'",
+  "'ConZoL is newer than the MDR'"
+ ],
+ [
+  "'MDR ใหม่กว่า ConZoL'",
+  "'MDR is newer than ConZoL'"
+ ],
+ [
+  "'คนละชุด Rev (T/R)'",
+  "'Different revision series (T/R)'"
+ ],
+ [
+  "// T กับ R เทียบกันตรง ๆ ไม่ได้ ต้องให้คนดู",
+  "// T and R cannot be compared directly - leave the call to a person"
  ]
 ]

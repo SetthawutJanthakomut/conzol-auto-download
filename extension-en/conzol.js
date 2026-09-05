@@ -6,7 +6,7 @@
   // If a panel already exists the later copy stops here - otherwise ids collide and buttons stop responding
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '4.8';   // kept in sync with @version at build time
+  const VERSION = '4.9';   // kept in sync with @version at build time
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.user.js';   // filled in per language at build time
 
   // ---------------- Settings ----------------
@@ -51,7 +51,7 @@
   const FSA = typeof window.showDirectoryPicker === 'function';
 
   let stopFlag = false, running = false;
-  let mdrList = [], mdrExcluded = 0, lastReport = [];
+  let mdrList = [], mdrExcluded = 0, mdrDropped = [], lastReport = [];
   let rootDir = null;          // FileSystemDirectoryHandle
   let existing = new Map();    // DOCNO -> [{name, rev, rank, parent}]
 
@@ -289,6 +289,61 @@
   }
 
   // ============ Read the MDR file ============
+  // MDR column headings - used to locate each column, so nothing is tied to A/B/C
+  const MDR_HDR = {
+    sn:    ['S/N', 'S/N.', 'NO', 'NO.', 'ITEM'],
+    title: ['TITLE', 'DOCUMENT TITLE'],
+    act:   ['ACTIVITY ID'],
+    bud:   ['BUDGET'],
+    cls:   ['CLASS'],
+    rev:   ['REV', 'REV.'],          // several rounds - take the right-most cell that has a value
+    sts:   ['STATUS'],
+    prg:   ['PROGRESS (%)', 'PROGRESS(%)', 'PROGRESS', 'PROGRESS %']
+  };
+  const DOC_HDR = ['DOCUMENT NO', 'DOCUMENT NO.', 'DOC NO', 'DOC NO.'];
+
+  const cellText = (ws, R, C) => {
+    const c = ws[XLSX.utils.encode_cell({ r: R, c: C })];
+    if (!c) return '';
+    return String(c.w != null ? c.w : (c.v != null ? c.v : '')).trim();
+  };
+
+  // Find the header row and return the column of each heading (rev/sts may repeat)
+  function findHeader(ws, rng) {
+    const lim = Math.min(rng.e.r, rng.s.r + 40);
+    for (let R = rng.s.r; R <= lim; R++) {
+      for (let C = rng.s.c; C <= rng.e.c; C++) {
+        const t = cellText(ws, R, C).toUpperCase().replace(/\s+/g, ' ');
+        if (!DOC_HDR.includes(t)) continue;
+        const cols = { doc: C, rev: [], sts: [] };
+        for (let r = R; r <= Math.min(R + 4, rng.e.r); r++) {
+          for (let c = rng.s.c; c <= rng.e.c; c++) {
+            const h = cellText(ws, r, c).toUpperCase().replace(/\s+/g, ' ');
+            if (!h) continue;
+            for (const key of Object.keys(MDR_HDR)) {
+              if (!MDR_HDR[key].includes(h)) continue;
+              if (key === 'rev' || key === 'sts') { if (!cols[key].includes(c)) cols[key].push(c); }
+              else if (cols[key] == null) cols[key] = c;
+            }
+          }
+        }
+        // Rev./Status headings sit on several rows - sort by column so the right-most cell wins
+        cols.rev.sort((a, b) => a - b);
+        cols.sts.sort((a, b) => a - b);
+        // A Status column next to a Rev. column is the issue status; the rest are the owner's reply
+        const rv = new Set(cols.rev);
+        cols.issue = cols.sts.filter((c) => rv.has(c + 1));
+        cols.reply = cols.sts.filter((c) => !rv.has(c + 1));
+        return { row: R, cols };
+      }
+    }
+    return null;
+  }
+  const lastOf = (ws, R, list) => {
+    for (let i = list.length - 1; i >= 0; i--) { const t = cellText(ws, R, list[i]); if (t) return t; }
+    return '';
+  };
+
   function readWorkbook(wb, sheetName) {
     const keep = new Map(), dropped = new Set();
     const sheets = sheetName === '*' ? wb.SheetNames : [sheetName];
@@ -296,6 +351,7 @@
       const ws = wb.Sheets[sn];
       if (!ws || !ws['!ref']) continue;
       const rng = XLSX.utils.decode_range(ws['!ref']);
+      const hdr = findHeader(ws, rng);
       for (let R = rng.s.r; R <= rng.e.r; R++) {
         let docVal = null, titleVal = '', isDeleted = false;
         for (let C = rng.s.c; C <= rng.e.c; C++) {
@@ -318,11 +374,26 @@
         }
         if (!docVal) continue;
         if (isDeleted) { dropped.add(norm(docVal)); continue; }
-        if (!keep.has(norm(docVal))) keep.set(norm(docVal), { doc: docVal, title: titleVal, sheet: sn });
+        if (keep.has(norm(docVal))) continue;
+        const row = { doc: docVal, title: titleVal, sheet: sn };
+        if (hdr && R > hdr.row) {
+          const c = hdr.cols;
+          if (c.title != null) { const t = cellText(ws, R, c.title); if (t) row.title = t; }
+          if (c.sn != null)  row.sn  = cellText(ws, R, c.sn);
+          if (c.act != null) row.act = cellText(ws, R, c.act);
+          if (c.bud != null) row.bud = cellText(ws, R, c.bud);
+          if (c.cls != null) row.cls = cellText(ws, R, c.cls);
+          if (c.prg != null) row.prg = cellText(ws, R, c.prg);
+          row.rev = lastOf(ws, R, c.rev);
+          row.issue = lastOf(ws, R, c.issue);
+          row.reply = lastOf(ws, R, c.reply);
+        }
+        keep.set(norm(docVal), row);
       }
     }
     for (const k of dropped) keep.delete(k);
     mdrExcluded = dropped.size;
+    mdrDropped = [...dropped];
     return [...keep.values()];
   }
 
@@ -1033,8 +1104,36 @@
       }
       cmp.sort((a, b) => a.doc.localeCompare(b.doc));
 
-      // ---- Write the workbook ----
+      // ---- Sheet MDR: laid out like the project MDR, plus a Result column ----
       const wb = XLSX.utils.book_new();
+      if (mdrList.length) {
+        const byK = new Map(cmp.map((r) => [norm(r.doc), r]));
+        const rows = mdrList.map((m, i) => {
+          const c = byK.get(norm(m.doc));
+          const czRev = c ? c.crev : '';
+          // Compare the revision the MDR records against the latest revision in ConZoL
+          let vs = '';
+          if (!czRev) vs = '-';
+          else if (!m.rev) vs = 'MDR has no revision yet';
+          else if (norm(m.rev) === norm(czRev)) vs = 'Up to date';
+          else if (String(m.rev).trim()[0].toUpperCase() !== String(czRev).trim()[0].toUpperCase())
+            vs = 'Different revision series (T/R)';   // T and R cannot be compared directly - leave the call to a person
+          else vs = (rankOf(czRev) > rankOf(m.rev)) ? 'ConZoL is newer than the MDR' : 'MDR is newer than ConZoL';
+          return [m.sn || (i + 1), m.doc, m.title || '', m.act || '', m.bud || '', m.cls || '',
+                  m.rev || '', m.issue || '', m.reply || '', m.prg || '',
+                  czRev, vs, c ? c.result : 'Not found in ConZoL', m.sheet || ''];
+        });
+        XLSX.utils.book_append_sheet(wb, mkSheet(
+          [['S/N', 'Document No.', 'Title', 'Activity ID', 'Budget', 'Class',
+            'Rev.', 'Issue Status', "Owner's Reply", 'Progress', 'ConZoL Rev', 'MDR vs ConZoL', 'Result', 'MDR Sheet']].concat(rows),
+          [6, 26, 46, 13, 9, 7, 7, 12, 13, 9, 11, 22, 30, 18]), 'MDR');
+        log(`  MDR sheet: ${rows.length} rows (${mdrExcluded} cancelled row(s) left out)`, 'ok');
+        if (mdrDropped.length) log('    cancelled in the MDR: ' + mdrDropped.join(', '), 'sk');
+      } else {
+        log('· No MDR file chosen in step 2 - the MDR sheet is skipped', 'wn');
+      }
+
+      // ---- Write the workbook ----
       XLSX.utils.book_append_sheet(wb, mkSheet(
         [['S/N', 'Document No.', 'Rev', 'Title', 'File Name', 'Type', 'Folder', 'Status', 'Size (MB)', 'Modified']]
           .concat(fRows.map((r, i) => [i + 1, r.doc, r.rev, r.title, r.file, r.ext, r.folder, r.status, r.size, r.mtime])),
