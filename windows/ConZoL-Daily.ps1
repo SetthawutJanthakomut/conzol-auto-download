@@ -4,9 +4,10 @@
 
 $ProfileName = 'setthawut'
 # Chrome keeps profiles in folders called Default, Profile 1, Profile 2 ...
-# Set this to pin one and skip the name lookup entirely. Leave it empty to
-# look the folder up from the name above.
-$ProfileDir  = 'Profile 1'
+# This one is pinned so a renamed profile cannot send the run elsewhere.
+# To find another profile's folder: open it, go to chrome://version, and
+# read the last part of Profile Path. Leave empty to look it up by name.
+$ProfileDir  = 'Default'
 $Url         = 'https://edms.gulf.co.th/dms/drawing.asp'
 $LogFile     = Join-Path $PSScriptRoot 'ConZoL-Daily.log'
 
