@@ -1102,5 +1102,9 @@
  [
   "log(`      ↳ อ่าน R.Code ของ ${doc} ไม่ได้: ${e.message}`, 'wn');",
   "log(`      ↳ could not read the R.Code for ${doc}: ${e.message}`, 'wn');"
+ ],
+ [
+  "// จำค่าช่องติ๊กไว้ เปิดหน้าใหม่หรือวันรุ่งขึ้นก็ยังเป็นค่าที่ตั้งไว้",
+  "// Remember the checkboxes, so a new page or the next morning keeps the same settings"
  ]
 ]

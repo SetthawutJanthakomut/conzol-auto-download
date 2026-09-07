@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GULF ConZoL – Auto Download + Rename + Sort (MDR)
 // @namespace    gmtp.marine.jay
-// @version      5.7
+// @version      5.8
 // @description  ดาวน์โหลด PDF และไฟล์แนบ (FILE+) จาก ConZoL ลงโฟลเดอร์ที่เลือกไว้โดยตรง (ไม่ผ่าน Download ของ Chrome) ตั้งชื่อ <DocNo>-<Rev>_<Title>.pdf แยกโฟลเดอร์ตามหมวด ย้าย Rev เก่าเข้า _Superseded และอ่านรายการจากไฟล์ MDR ให้เอง
 // @author       JAY
 // @match        https://edms.gulf.co.th/dms/drawing.asp*
@@ -22,7 +22,7 @@
   // ถ้ามีกล่องอยู่แล้ว ให้ชุดที่มาทีหลังหยุดทำงาน ไม่งั้น id จะซ้ำและปุ่มจะกดไม่ติด
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '5.7';   // ซิงก์อัตโนมัติจาก @version ตอน build
+  const VERSION = '5.8';   // ซิงก์อัตโนมัติจาก @version ตอน build
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.th.user.js';   // build.py ใส่ให้ตามภาษา
 
   // ---------------- ตั้งค่าได้ตรงนี้ ----------------
@@ -722,7 +722,7 @@
       <div class="pane" data-p="opt">
         <label><input type="checkbox" id="edl-skip" checked> ข้ามไฟล์ที่มีอยู่ในโฟลเดอร์แล้ว</label>
         <label><input type="checkbox" id="edl-sup" checked> ย้าย Rev เก่าเข้า _Superseded</label>
-        <label><input type="checkbox" id="edl-rcode"> ใส่ R.Code ต่อท้าย Rev ในชื่อไฟล์ (…-T0-AC_…)</label>
+        <label><input type="checkbox" id="edl-rcode" checked> ใส่ R.Code ต่อท้าย Rev ในชื่อไฟล์ (…-T0-AC_…)</label>
         <label><input type="checkbox" id="edl-area" checked> แยกโฟลเดอร์ย่อยตามพื้นที่ (1400 / 0500 / PCC …)</label>
         <label><input type="checkbox" id="edl-inactive"> ค้นรวมเอกสารที่ไม่ Active</label>
         <button id="edl-csv">บันทึกรายงาน CSV</button>
@@ -1244,6 +1244,16 @@
     const last = getLS(LAST_KEY, '');
     d.textContent = msg || (last ? 'รันอัตโนมัติล่าสุด: ' + last : 'ยังไม่เคยรันอัตโนมัติ');
   }
+  // จำค่าช่องติ๊กไว้ เปิดหน้าใหม่หรือวันรุ่งขึ้นก็ยังเป็นค่าที่ตั้งไว้
+  ['edl-rcode', 'edl-skip', 'edl-sup', 'edl-area', 'edl-inactive', 'edl-getpdf', 'edl-getfile',
+   'edl-sh-mdr', 'edl-sh-rev', 'edl-sh-folder', 'edl-sh-conzol', 'edl-sh-cmp'].forEach((id) => {
+    const c = el(id);
+    if (!c) return;
+    const v = getLS('edms_cb_' + id, '');
+    if (v === '1' || v === '0') c.checked = (v === '1');
+    c.addEventListener('change', () => setLS('edms_cb_' + id, c.checked ? '1' : '0'));
+  });
+
   el('edl-auto').checked = getLS(AUTO_KEY, '') === '1';
   el('edl-auto').onchange = () => { setLS(AUTO_KEY, el('edl-auto').checked ? '1' : '0'); showAutoInfo(); };
   el('edl-watchread').onclick = () => showWatch();
