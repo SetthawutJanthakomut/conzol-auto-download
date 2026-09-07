@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GULF ConZoL – Auto Download + Rename + Sort (MDR)
 // @namespace    gmtp.marine.jay
-// @version      5.6
+// @version      5.7
 // @description  ดาวน์โหลด PDF และไฟล์แนบ (FILE+) จาก ConZoL ลงโฟลเดอร์ที่เลือกไว้โดยตรง (ไม่ผ่าน Download ของ Chrome) ตั้งชื่อ <DocNo>-<Rev>_<Title>.pdf แยกโฟลเดอร์ตามหมวด ย้าย Rev เก่าเข้า _Superseded และอ่านรายการจากไฟล์ MDR ให้เอง
 // @author       JAY
 // @match        https://edms.gulf.co.th/dms/drawing.asp*
@@ -22,7 +22,7 @@
   // ถ้ามีกล่องอยู่แล้ว ให้ชุดที่มาทีหลังหยุดทำงาน ไม่งั้น id จะซ้ำและปุ่มจะกดไม่ติด
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '5.6';   // ซิงก์อัตโนมัติจาก @version ตอน build
+  const VERSION = '5.7';   // ซิงก์อัตโนมัติจาก @version ตอน build
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.th.user.js';   // build.py ใส่ให้ตามภาษา
 
   // ---------------- ตั้งค่าได้ตรงนี้ ----------------
@@ -107,14 +107,14 @@
   let existing = new Map();    // DOCNO -> [{name, rev, rank, parent}]
 
   // ============ ชื่อไฟล์ / โฟลเดอร์ ============
-  const FN_RE  = /^(GMTP-[A-Z0-9\-]+?)-([TR])(\d+)_/i;
+  const FN_RE  = /^(GMTP-[A-Z0-9\-]+?)-([TR])(\d+)(?:-([A-Z]{2,4}))?_/i;
   const DOC_RE = /\bGMTP-[A-Z0-9]+(?:-[A-Z0-9]+)*-\d{3,4}\b/i;
   // ไม่จำกัดนามสกุล — ConZoL ส่งไฟล์แนบมาเป็นอะไรก็ได้ (zip, dwg, dgn, msg, ...)
   // รับทุกไฟล์ที่ชื่อขึ้นต้นด้วยเลขเอกสาร ยกเว้นไฟล์ที่ยังโหลดไม่จบ
   const SKIP_EXT = /\.(tmp|crdownload|part|partial|download|!ut)$/i;
 
   function safeName(r, ext) {
-    let base = r.doc + (r.rev ? '-' + r.rev : '') + (r.title ? '_' + r.title : '');
+    let base = r.doc + (r.rev ? '-' + r.rev : '') + (r.rcode ? '-' + r.rcode : '') + (r.title ? '_' + r.title : '');
     base = base.replace(/[\\/:*?"<>|\r\n\t]/g, '-').replace(/\s+/g, ' ').replace(/[. ]+$/g, '').trim();
     if (base.length > CFG.maxNameLen) base = base.slice(0, CFG.maxNameLen).trim();
     return base + '.' + String(ext || 'pdf').toLowerCase();
@@ -722,6 +722,7 @@
       <div class="pane" data-p="opt">
         <label><input type="checkbox" id="edl-skip" checked> ข้ามไฟล์ที่มีอยู่ในโฟลเดอร์แล้ว</label>
         <label><input type="checkbox" id="edl-sup" checked> ย้าย Rev เก่าเข้า _Superseded</label>
+        <label><input type="checkbox" id="edl-rcode"> ใส่ R.Code ต่อท้าย Rev ในชื่อไฟล์ (…-T0-AC_…)</label>
         <label><input type="checkbox" id="edl-area" checked> แยกโฟลเดอร์ย่อยตามพื้นที่ (1400 / 0500 / PCC …)</label>
         <label><input type="checkbox" id="edl-inactive"> ค้นรวมเอกสารที่ไม่ Active</label>
         <button id="edl-csv">บันทึกรายงาน CSV</button>
@@ -1016,6 +1017,8 @@
     const doSup = el('edl-sup').checked;
     const wantPdf = el('edl-getpdf').checked;
     const wantFile = el('edl-getfile').checked;
+    const wantRCode = el('edl-rcode').checked;
+    const revCache = new Map();   // fileid -> ประวัติ Rev เผื่อเอกสารเดิมโผล่ซ้ำ
     const useFS = !!rootDir;
 
     if (!wantPdf && !wantFile) {
@@ -1023,7 +1026,7 @@
       return { ok, skipped, fail, sup };
     }
 
-    for (const r of items) {
+    for (let r of items) {
       if (stopFlag) { log('■ หยุดโดยผู้ใช้', 'er'); break; }
       i++;
       const doc = r.doc.toUpperCase();
@@ -1032,6 +1035,16 @@
       if (!existing.has(doc)) existing.set(doc, []);
       const have = existing.get(doc);
       const parts = targetPath(doc, r.groupCode, r.groupName);
+
+      // R.Code อยู่ในตารางประวัติ ไม่ได้อยู่ในหน้าผลค้นหา ต้องไปดึงมาต่างหาก
+      if (wantRCode && !r.rcode && r.fileid) {
+        try {
+          let h = revCache.get(r.fileid);
+          if (!h) { h = await fetchRevisions(r.fileid); revCache.set(r.fileid, h); await sleep(CFG.histDelayMs); }
+          const hit = h.find((x) => norm(x.rev) === norm(r.rev));
+          if (hit && hit.rcode) r = { ...r, rcode: hit.rcode };
+        } catch (e) { log(`      ↳ อ่าน R.Code ของ ${doc} ไม่ได้: ${e.message}`, 'wn'); }
+      }
 
       const kinds = [];
       if (wantPdf) kinds.push({ ext: 'pdf', url: 'getfile.asp?type=p&fileid=' + r.fileid + '&docid=0' });

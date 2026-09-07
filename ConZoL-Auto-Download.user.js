@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GULF ConZoL - Auto Download + Rename + Sort
 // @namespace    gmtp.conzol
-// @version      5.6
+// @version      5.7
 // @description  Download PDFs and native attachments from GULF ConZoL EDMS automatically - names each file and sorts it into the folder ConZoL assigns.
 // @match        https://edms.gulf.co.th/dms/drawing.asp*
 // @match        http://edms.gulf.co.th/dms/drawing.asp*
@@ -22,7 +22,7 @@
   // If a panel already exists the later copy stops here - otherwise ids collide and buttons stop responding
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '5.6';   // kept in sync with @version at build time
+  const VERSION = '5.7';   // kept in sync with @version at build time
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.user.js';   // filled in per language at build time
 
   // ---------------- Settings ----------------
@@ -124,14 +124,14 @@
   let existing = new Map();    // DOCNO -> [{name, rev, rank, parent}]
 
   // ============ File and folder names ============
-  const FN_RE  = /^(GMTP-[A-Z0-9\-]+?)-([TR])(\d+)_/i;
+  const FN_RE  = /^(GMTP-[A-Z0-9\-]+?)-([TR])(\d+)(?:-([A-Z]{2,4}))?_/i;
   const DOC_RE = /\bGMTP-[A-Z0-9]+(?:-[A-Z0-9]+)*-\d{3,4}\b/i;
   // No extension whitelist - ConZoL can hand back any attachment type (zip, dwg, dgn, msg, ...)
   // Accept any file whose name starts with a document number, except part-downloads
   const SKIP_EXT = /\.(tmp|crdownload|part|partial|download|!ut)$/i;
 
   function safeName(r, ext) {
-    let base = r.doc + (r.rev ? '-' + r.rev : '') + (r.title ? '_' + r.title : '');
+    let base = r.doc + (r.rev ? '-' + r.rev : '') + (r.rcode ? '-' + r.rcode : '') + (r.title ? '_' + r.title : '');
     base = base.replace(/[\\/:*?"<>|\r\n\t]/g, '-').replace(/\s+/g, ' ').replace(/[. ]+$/g, '').trim();
     if (base.length > CFG.maxNameLen) base = base.slice(0, CFG.maxNameLen).trim();
     return base + '.' + String(ext || 'pdf').toLowerCase();
@@ -739,6 +739,7 @@
       <div class="pane" data-p="opt">
         <label><input type="checkbox" id="edl-skip" checked> Skip files already in the folder</label>
         <label><input type="checkbox" id="edl-sup" checked> Move superseded revisions to _Superseded</label>
+        <label><input type="checkbox" id="edl-rcode"> Add R.Code after the revision in the file name (…-T0-AC_…)</label>
         <label><input type="checkbox" id="edl-area" checked> Sub-folder per area code (1400 / 0500 / PCC …)</label>
         <label><input type="checkbox" id="edl-inactive"> Include non-active documents in search</label>
         <button id="edl-csv">Save CSV report</button>
@@ -1033,6 +1034,8 @@
     const doSup = el('edl-sup').checked;
     const wantPdf = el('edl-getpdf').checked;
     const wantFile = el('edl-getfile').checked;
+    const wantRCode = el('edl-rcode').checked;
+    const revCache = new Map();   // fileid -> revision history, in case a document comes round twice
     const useFS = !!rootDir;
 
     if (!wantPdf && !wantFile) {
@@ -1040,7 +1043,7 @@
       return { ok, skipped, fail, sup };
     }
 
-    for (const r of items) {
+    for (let r of items) {
       if (stopFlag) { log('■ Stopped by user', 'er'); break; }
       i++;
       const doc = r.doc.toUpperCase();
@@ -1049,6 +1052,16 @@
       if (!existing.has(doc)) existing.set(doc, []);
       const have = existing.get(doc);
       const parts = targetPath(doc, r.groupCode, r.groupName);
+
+      // R.Code lives in the revision history, not in the search results, so it is fetched
+      if (wantRCode && !r.rcode && r.fileid) {
+        try {
+          let h = revCache.get(r.fileid);
+          if (!h) { h = await fetchRevisions(r.fileid); revCache.set(r.fileid, h); await sleep(CFG.histDelayMs); }
+          const hit = h.find((x) => norm(x.rev) === norm(r.rev));
+          if (hit && hit.rcode) r = { ...r, rcode: hit.rcode };
+        } catch (e) { log(`      ↳ could not read the R.Code for ${doc}: ${e.message}`, 'wn'); }
+      }
 
       const kinds = [];
       if (wantPdf) kinds.push({ ext: 'pdf', url: 'getfile.asp?type=p&fileid=' + r.fileid + '&docid=0' });

@@ -141,7 +141,7 @@ its display name, so it keeps working when Chrome renumbers its profile folders.
 
 | | |
 |---|---|
-| **Naming** | `<DocNo>-<Rev>_<Title>.<ext>` — title comes from ConZoL |
+| **Naming** | `<DocNo>-<Rev>_<Title>.<ext>` — title comes from ConZoL. Options can add the owner's reply code: `<DocNo>-<Rev>-<R.Code>_<Title>` |
 | **Folders** | Read from ConZoL's own group headers (`MA-CAL:MARINE Calculation`), never hard-coded — new disciplines and document types work with no changes |
 | **Areas** | `1400`, `0500`, `PCC`, `CAZ` … become sub-folders; add friendly labels in `AREA_LABELS` |
 | **Revisions** | Latest revision stays in place, older ones move to a `_Superseded\` folder inside the same document folder |

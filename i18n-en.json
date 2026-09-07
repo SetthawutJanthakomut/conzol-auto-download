@@ -1086,5 +1086,21 @@
  [
   "{ msg.textContent = 'ขอ token จากเซิร์ฟเวอร์ไม่สำเร็จ — กด SIGN IN เองอีกที'; return; }",
   "{ msg.textContent = 'The server did not return a token - press SIGN IN yourself'; return; }"
+ ],
+ [
+  " ใส่ R.Code ต่อท้าย Rev ในชื่อไฟล์ (…-T0-AC_…)</label>",
+  " Add R.Code after the revision in the file name (…-T0-AC_…)</label>"
+ ],
+ [
+  "// R.Code อยู่ในตารางประวัติ ไม่ได้อยู่ในหน้าผลค้นหา ต้องไปดึงมาต่างหาก",
+  "// R.Code lives in the revision history, not in the search results, so it is fetched"
+ ],
+ [
+  "// fileid -> ประวัติ Rev เผื่อเอกสารเดิมโผล่ซ้ำ",
+  "// fileid -> revision history, in case a document comes round twice"
+ ],
+ [
+  "log(`      ↳ อ่าน R.Code ของ ${doc} ไม่ได้: ${e.message}`, 'wn');",
+  "log(`      ↳ could not read the R.Code for ${doc}: ${e.message}`, 'wn');"
  ]
 ]
