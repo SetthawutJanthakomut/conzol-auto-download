@@ -3,6 +3,10 @@
 # Change $ProfileName below if you ever want a different Chrome profile.
 
 $ProfileName = 'setthawut'
+# Chrome keeps profiles in folders called Default, Profile 1, Profile 2 ...
+# Set this to pin one and skip the name lookup entirely. Leave it empty to
+# look the folder up from the name above.
+$ProfileDir  = 'Profile 1'
 $Url         = 'https://edms.gulf.co.th/dms/drawing.asp'
 $LogFile     = Join-Path $PSScriptRoot 'ConZoL-Daily.log'
 
@@ -25,16 +29,23 @@ try {
     }
     if (-not $chrome) { throw 'chrome.exe not found' }
 
-    # ---- 2) turn the profile name shown in Chrome into its folder name --------
-    # Chrome stores them as Default, Profile 1, Profile 2 ... and keeps the
-    # display names in Local State, so the folder is looked up rather than guessed.
-    # Local State is rewritten while Chrome runs, so a read can catch it empty -
-    # hence the retries, and the resolved folder is remembered in a small file
-    # next to this script so a bad read never sends us to the wrong profile.
-    $dir      = $null
+    # ---- 2) work out which profile folder to open ----------------------------
+    # $ProfileDir wins if it is set. Otherwise the name is looked up in Local
+    # State, which Chrome rewrites while it runs, so a read can catch it empty -
+    # hence the retries and the folder remembered next to this script.
+    #
+    # The lookup checks the profile label first (name, shortcut_name) and only
+    # then the Google account fields, because a second profile signed in to the
+    # same Google account carries the same gaia name and would match first.
     $cacheFile = Join-Path $PSScriptRoot 'ConZoL-Daily.profile'
     $state     = Join-Path $env:LOCALAPPDATA 'Google\Chrome\User Data\Local State'
     $want      = $ProfileName.ToLower()
+    $dir       = $null
+
+    if ($ProfileDir) {
+        $dir = $ProfileDir
+        Write-Log ("using the folder set in the script: '" + $dir + "'")
+    }
 
     for ($try = 1; $try -le 3 -and -not $dir; $try++) {
         if (-not (Test-Path $state)) { break }
@@ -45,18 +56,18 @@ try {
             $cache = $null
         }
         if ($cache) {
-            # every name Chrome might be showing for a profile
-            $rows = @()
-            foreach ($p in $cache.PSObject.Properties) {
-                foreach ($f in @('name', 'shortcut_name', 'gaia_name', 'gaia_given_name')) {
-                    $v = $p.Value.$f
-                    if ($v) { $rows += [pscustomobject]@{ Dir = $p.Name; Text = $v.ToLower() } }
+            foreach ($fields in @(@('name', 'shortcut_name'), @('gaia_name', 'gaia_given_name'))) {
+                $rows = @()
+                foreach ($p in $cache.PSObject.Properties) {
+                    foreach ($f in $fields) {
+                        $v = $p.Value.$f
+                        if ($v) { $rows += [pscustomobject]@{ Dir = $p.Name; Text = $v.ToLower() } }
+                    }
                 }
+                $hit = $rows | Where-Object { $_.Text -eq $want } | Select-Object -First 1
+                if (-not $hit) { $hit = $rows | Where-Object { $_.Text.StartsWith($want) } | Select-Object -First 1 }
+                if ($hit) { $dir = $hit.Dir; break }
             }
-            $hit = $rows | Where-Object { $_.Text -eq $want } | Select-Object -First 1
-            if (-not $hit) { $hit = $rows | Where-Object { $_.Text.StartsWith($want) } | Select-Object -First 1 }
-            if (-not $hit) { $hit = $rows | Where-Object { $_.Text.Contains($want) } | Select-Object -First 1 }
-            if ($hit) { $dir = $hit.Dir }
         }
         if (-not $dir -and $try -lt 3) { Start-Sleep -Milliseconds 700 }
     }
