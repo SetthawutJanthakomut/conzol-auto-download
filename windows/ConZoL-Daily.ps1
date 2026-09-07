@@ -28,30 +28,47 @@ try {
     # ---- 2) turn the profile name shown in Chrome into its folder name --------
     # Chrome stores them as Default, Profile 1, Profile 2 ... and keeps the
     # display names in Local State, so the folder is looked up rather than guessed.
-    $dir   = 'Default'
-    $state = Join-Path $env:LOCALAPPDATA 'Google\Chrome\User Data\Local State'
-    if (Test-Path $state) {
-        $json  = Get-Content -Path $state -Raw | ConvertFrom-Json
-        $cache = $json.profile.info_cache
-        $want  = $ProfileName.ToLower()
-        $found = $null
-        foreach ($p in $cache.PSObject.Properties) {
-            $n = $p.Value.name
-            if ($n -and $n.ToLower() -eq $want) { $found = $p.Name; break }
+    # Local State is rewritten while Chrome runs, so a read can catch it empty -
+    # hence the retries, and the resolved folder is remembered in a small file
+    # next to this script so a bad read never sends us to the wrong profile.
+    $dir      = $null
+    $cacheFile = Join-Path $PSScriptRoot 'ConZoL-Daily.profile'
+    $state     = Join-Path $env:LOCALAPPDATA 'Google\Chrome\User Data\Local State'
+    $want      = $ProfileName.ToLower()
+
+    for ($try = 1; $try -le 3 -and -not $dir; $try++) {
+        if (-not (Test-Path $state)) { break }
+        try {
+            $json  = Get-Content -Path $state -Raw -ErrorAction Stop | ConvertFrom-Json
+            $cache = $json.profile.info_cache
+        } catch {
+            $cache = $null
         }
-        if (-not $found) {
+        if ($cache) {
+            # every name Chrome might be showing for a profile
+            $rows = @()
             foreach ($p in $cache.PSObject.Properties) {
-                $n = $p.Value.name
-                if ($n -and $n.ToLower().StartsWith($want)) { $found = $p.Name; break }
+                foreach ($f in @('name', 'shortcut_name', 'gaia_name', 'gaia_given_name')) {
+                    $v = $p.Value.$f
+                    if ($v) { $rows += [pscustomobject]@{ Dir = $p.Name; Text = $v.ToLower() } }
+                }
             }
+            $hit = $rows | Where-Object { $_.Text -eq $want } | Select-Object -First 1
+            if (-not $hit) { $hit = $rows | Where-Object { $_.Text.StartsWith($want) } | Select-Object -First 1 }
+            if (-not $hit) { $hit = $rows | Where-Object { $_.Text.Contains($want) } | Select-Object -First 1 }
+            if ($hit) { $dir = $hit.Dir }
         }
-        if ($found) {
-            $dir = $found
-        } else {
-            Write-Log ("profile '" + $ProfileName + "' not found in Local State - falling back to Default")
-        }
+        if (-not $dir -and $try -lt 3) { Start-Sleep -Milliseconds 700 }
+    }
+
+    if ($dir) {
+        Set-Content -Path $cacheFile -Value $dir
+    } elseif (Test-Path $cacheFile) {
+        $dir = (Get-Content -Path $cacheFile -Raw).Trim()
+        Write-Log ("Local State unreadable - using the remembered folder '" + $dir + "'")
     } else {
-        Write-Log 'Local State not found - falling back to Default'
+        $dir = 'Default'
+        Write-Log ("profile '" + $ProfileName + "' not found and nothing remembered - using Default")
     }
 
     # ---- 3) open ConZoL in that profile --------------------------------------
