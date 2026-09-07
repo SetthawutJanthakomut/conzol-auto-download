@@ -1042,5 +1042,49 @@
  [
   "'· ทำงานตาม watchlist ไม่สำเร็จ: '",
   "'· The watch-list run failed: '"
+ ],
+ [
+  "// ---------------- หน้า login ----------------",
+  "// ---------------- The login page ----------------"
+ ],
+ [
+  "// Chrome ซ่อนรหัสที่เติมให้อัตโนมัติจากสคริปต์ จนกว่าจะมีการคลิกในหน้าจริง ๆ",
+  "// Chrome hides an autofilled password from page scripts until the page is actually clicked"
+ ],
+ [
+  "// ถ้ากด SIGN IN เองโดยไม่มีคลิกมาก่อน รหัสที่ส่งไปจะว่าง ล็อกอินพลาด และเสี่ยงโดนล็อกบัญชี",
+  "// Clicking SIGN IN without that would post a blank password - a failed login, and a lockout risk"
+ ],
+ [
+  "// เลยทำแค่ขึ้นแถบเตือนว่างานประจำวันยังค้าง แล้วให้กดปุ่มเดียว — คลิกนั้นแหละคือกุญแจ",
+  "// So this only shows that the daily run is waiting; the one click it asks for is the key"
+ ],
+ [
+  "'<div id=\"edl-lmsg\">งานประจำวันยังไม่ได้ทำ — เข้าระบบก่อน แล้วจะเริ่มให้เอง</div>' +",
+  "'<div id=\"edl-lmsg\">Today\\'s run is waiting - sign in and it starts on its own</div>' +"
+ ],
+ [
+  "'border:1px solid #2c5c2c;border-radius:4px;background:#3d7a3d;color:#fff\">เข้าระบบแล้วเริ่มงานประจำวัน</button>' +",
+  "'border:1px solid #2c5c2c;border-radius:4px;background:#3d7a3d;color:#fff\">Sign in and start today\\'s run</button>' +"
+ ],
+ [
+  "msg.textContent = 'หาแบบฟอร์มล็อกอินไม่เจอ — เข้าระบบเองตามปกติ'; return;",
+  "msg.textContent = 'Could not find the login form - sign in as usual'; return;"
+ ],
+ [
+  "msg.textContent = 'Chrome ยังไม่ได้เติมรหัสให้ — พิมพ์เองแล้วกด SIGN IN ตามปกติ ระบบจะทำงานต่อเอง';",
+  "msg.textContent = 'Chrome has not filled the password - type it and press SIGN IN as usual, the run follows';"
+ ],
+ [
+  "// หน้านี้ขอ token key ตามชื่อผู้ใช้ตอน blur แล้วเอาไปเข้ารหัสรหัสผ่านตอนกด SIGN IN",
+  "// The page fetches a token key for the username on blur, then encrypts the password with it on submit"
+ ],
+ [
+  "msg.textContent = 'กำลังเข้าระบบ …';",
+  "msg.textContent = 'Signing in …';"
+ ],
+ [
+  "{ msg.textContent = 'ขอ token จากเซิร์ฟเวอร์ไม่สำเร็จ — กด SIGN IN เองอีกที'; return; }",
+  "{ msg.textContent = 'The server did not return a token - press SIGN IN yourself'; return; }"
  ]
 ]

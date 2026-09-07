@@ -1,11 +1,13 @@
 // ==UserScript==
 // @name         GULF ConZoL – Auto Download + Rename + Sort (MDR)
 // @namespace    gmtp.marine.jay
-// @version      5.5
+// @version      5.6
 // @description  ดาวน์โหลด PDF และไฟล์แนบ (FILE+) จาก ConZoL ลงโฟลเดอร์ที่เลือกไว้โดยตรง (ไม่ผ่าน Download ของ Chrome) ตั้งชื่อ <DocNo>-<Rev>_<Title>.pdf แยกโฟลเดอร์ตามหมวด ย้าย Rev เก่าเข้า _Superseded และอ่านรายการจากไฟล์ MDR ให้เอง
 // @author       JAY
 // @match        https://edms.gulf.co.th/dms/drawing.asp*
 // @match        http://edms.gulf.co.th/dms/drawing.asp*
+// @match        https://edms.gulf.co.th/dms/login.asp*
+// @match        http://edms.gulf.co.th/dms/login.asp*
 // @require      https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js
 // @updateURL    https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.th.user.js
 // @downloadURL  https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.th.user.js
@@ -20,7 +22,7 @@
   // ถ้ามีกล่องอยู่แล้ว ให้ชุดที่มาทีหลังหยุดทำงาน ไม่งั้น id จะซ้ำและปุ่มจะกดไม่ติด
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '5.5';   // ซิงก์อัตโนมัติจาก @version ตอน build
+  const VERSION = '5.6';   // ซิงก์อัตโนมัติจาก @version ตอน build
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.th.user.js';   // build.py ใส่ให้ตามภาษา
 
   // ---------------- ตั้งค่าได้ตรงนี้ ----------------
@@ -47,6 +49,54 @@
 
   const $ = (t, p) => Object.assign(document.createElement(t), p || {});
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  // ---------------- หน้า login ----------------
+  // Chrome ซ่อนรหัสที่เติมให้อัตโนมัติจากสคริปต์ จนกว่าจะมีการคลิกในหน้าจริง ๆ
+  // ถ้ากด SIGN IN เองโดยไม่มีคลิกมาก่อน รหัสที่ส่งไปจะว่าง ล็อกอินพลาด และเสี่ยงโดนล็อกบัญชี
+  // เลยทำแค่ขึ้นแถบเตือนว่างานประจำวันยังค้าง แล้วให้กดปุ่มเดียว — คลิกนั้นแหละคือกุญแจ
+  if (/\/login\.asp/i.test(location.pathname)) {
+    const due = (() => {
+      try {
+        if (localStorage.getItem('edms_auto_v1') !== '1') return false;
+        const d = new Date();
+        const t = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        return localStorage.getItem('edms_autolast_v1') !== t;
+      } catch (e) { return false; }
+    })();
+    if (!due) return;
+    const bar = $('div');
+    bar.id = 'edmsdl-login';
+    bar.style.cssText = 'position:fixed;top:10px;right:10px;z-index:999999;width:290px;' +
+      'font:12px Tahoma,Verdana,sans-serif;background:#fff;color:#222;border:1px solid #b9a;' +
+      'border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.28);overflow:hidden';
+    bar.innerHTML = '<div style="background:#7a6a52;color:#fff;padding:6px 9px;font-weight:bold">' +
+      '⬇ ConZoL Auto Download</div><div style="padding:9px">' +
+      '<div id="edl-lmsg">งานประจำวันยังไม่ได้ทำ — เข้าระบบก่อน แล้วจะเริ่มให้เอง</div>' +
+      '<button id="edl-lgo" style="margin-top:8px;width:100%;font:12px Tahoma;padding:6px;cursor:pointer;' +
+      'border:1px solid #2c5c2c;border-radius:4px;background:#3d7a3d;color:#fff">เข้าระบบแล้วเริ่มงานประจำวัน</button>' +
+      '</div>';
+    document.body.appendChild(bar);
+    const msg = bar.querySelector('#edl-lmsg');
+    bar.querySelector('#edl-lgo').onclick = async (ev) => {
+      ev.preventDefault();
+      const lg = document.getElementById('login');
+      const pw = document.getElementById('password');
+      const btn = [...document.querySelectorAll('input[type=submit]')].pop();
+      if (!lg || !pw || !btn) { msg.textContent = 'หาแบบฟอร์มล็อกอินไม่เจอ — เข้าระบบเองตามปกติ'; return; }
+      if (!lg.value.trim() || !pw.value) {
+        msg.textContent = 'Chrome ยังไม่ได้เติมรหัสให้ — พิมพ์เองแล้วกด SIGN IN ตามปกติ ระบบจะทำงานต่อเอง';
+        return;
+      }
+      // หน้านี้ขอ token key ตามชื่อผู้ใช้ตอน blur แล้วเอาไปเข้ารหัสรหัสผ่านตอนกด SIGN IN
+      msg.textContent = 'กำลังเข้าระบบ …';
+      lg.dispatchEvent(new Event('blur'));
+      for (let i = 0; i < 40 && !window.mykey; i++) await sleep(200);
+      if (!window.mykey) { msg.textContent = 'ขอ token จากเซิร์ฟเวอร์ไม่สำเร็จ — กด SIGN IN เองอีกที'; return; }
+      btn.click();
+    };
+    return;
+  }
+
   const norm = (s) => String(s || '').toUpperCase().replace(/\s+/g, '').trim();
   const FSA = typeof window.showDirectoryPicker === 'function';
 

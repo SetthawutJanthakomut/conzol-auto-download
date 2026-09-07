@@ -10,6 +10,16 @@ new documents are on disk before you sit down.
 It cannot work with Chrome closed - the script lives inside the ConZoL page -
 which is why the task opens Chrome rather than downloading anything itself.
 
+If the ConZoL session is still alive, the whole run happens with no clicks
+at all. If it expired overnight, ConZoL shows its login page and the panel
+puts a small bar in the corner: press "Sign in and start today's run" once
+and everything continues by itself.
+
+The password is never handled by this tool. Chrome fills it, and Chrome keeps
+autofilled passwords hidden from page scripts until the page is clicked - so
+a click has to happen, and clicking blindly would post a blank password and
+could lock the account. One deliberate click a morning is the safe way round.
+
 Setup
 -----
 1. Keep these files together in one folder.

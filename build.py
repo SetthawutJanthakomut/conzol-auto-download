@@ -69,6 +69,8 @@ hdr = """// ==UserScript==
 // @description  Download PDFs and native attachments from GULF ConZoL EDMS automatically - names each file and sorts it into the folder ConZoL assigns.
 // @match        https://edms.gulf.co.th/dms/drawing.asp*
 // @match        http://edms.gulf.co.th/dms/drawing.asp*
+// @match        https://edms.gulf.co.th/dms/login.asp*
+// @match        http://edms.gulf.co.th/dms/login.asp*
 // @updateURL    %sConZoL-Auto-Download.user.js
 // @downloadURL  %sConZoL-Auto-Download.user.js
 // @require      https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js
@@ -85,7 +87,9 @@ for d, desc in [('build-th', 'ดาวน์โหลด PDF และไฟล
                 ('build-en', 'Download PDFs and native attachments from GULF ConZoL EDMS automatically - names each file and sorts it into the right folder.')]:
     json.dump({"manifest_version": 3, "name": "ConZoL Auto Download", "version": VER, "description": desc,
                "content_scripts": [{"matches": ["https://edms.gulf.co.th/dms/drawing.asp*",
-                                                "http://edms.gulf.co.th/dms/drawing.asp*"],
+                                                "http://edms.gulf.co.th/dms/drawing.asp*",
+                                                "https://edms.gulf.co.th/dms/login.asp*",
+                                                "http://edms.gulf.co.th/dms/login.asp*"],
                                     "js": ["conzol.js"], "run_at": "document_idle", "world": "MAIN"}],
                "icons": {"16": "icon16.png", "32": "icon32.png", "48": "icon48.png", "128": "icon128.png"},
                "minimum_chrome_version": "111"},

@@ -121,6 +121,12 @@ day, the panel searches ConZoL for every entry and downloads whatever is new or 
 It runs only when write permission to the folder is already granted, so it never raises a prompt you
 did not ask for; if permission has lapsed, press **Download the watch list now** once and it resumes.
 
+If the ConZoL session has expired the page shows its login form instead, and the panel puts a small
+bar in the corner — press **Sign in and start today's run** once and the rest continues on its own.
+The password is never handled here: Chrome fills it, and Chrome keeps an autofilled password hidden
+from page scripts until the page is clicked, so clicking SIGN IN unattended would post a blank
+password and could lock the account. One deliberate click is the safe way round it.
+
 This needs Chrome open and a ConZoL session — a page script cannot run with the browser closed. To
 get closer to hands-off on Windows, [`windows/`](windows) has a Task Scheduler job that opens ConZoL in
 a named Chrome profile each morning, and the daily run then happens on its own: run
@@ -303,6 +309,12 @@ MA-CAL
 
 จะทำงานก็ต่อเมื่อสิทธิ์เขียนโฟลเดอร์ยังอยู่ ไม่มีการเด้งขออนุญาตเอง ถ้าสิทธิ์หลุด
 กด **โหลดตาม watchlist เดี๋ยวนี้** หนึ่งครั้งก็กลับมาทำงานต่อ
+
+ถ้า session ของ ConZoL หมดอายุ หน้าเว็บจะขึ้นฟอร์มล็อกอินแทน กล่องจะขึ้นแถบเล็ก ๆ มุมจอ
+กด **เข้าระบบแล้วเริ่มงานประจำวัน** ครั้งเดียว ที่เหลือทำต่อเอง
+เครื่องมือนี้ไม่ยุ่งกับรหัสผ่าน — Chrome เป็นคนเติมให้ และ Chrome ซ่อนรหัสที่เติมอัตโนมัติ
+จากสคริปต์ในหน้าเว็บจนกว่าจะมีการคลิกจริง ถ้ากด SIGN IN เองโดยไม่มีคลิกมาก่อน
+รหัสที่ส่งไปจะว่าง ล็อกอินพลาด และเสี่ยงโดนล็อกบัญชี คลิกเดียวต่อเช้าจึงปลอดภัยกว่า
 
 ข้อจำกัด: ต้องเปิด Chrome และล็อกอิน ConZoL ค้างไว้ — สคริปต์ที่รันในหน้าเว็บทำงานตอนปิดเบราว์เซอร์ไม่ได้
 ถ้าอยากให้ใกล้เคียงอัตโนมัติเต็มตัวบน Windows ในโฟลเดอร์ [`windows/`](windows) มีชุดตั้ง Task Scheduler

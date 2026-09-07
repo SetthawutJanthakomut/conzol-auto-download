@@ -1,13 +1,15 @@
 {
   "manifest_version": 3,
   "name": "ConZoL Auto Download",
-  "version": "5.5",
+  "version": "5.6",
   "description": "ดาวน์โหลด PDF และไฟล์แนบจาก GULF ConZoL EDMS อัตโนมัติ ตั้งชื่อไฟล์และแยกโฟลเดอร์ตามกลุ่มเอกสารให้เอง",
   "content_scripts": [
     {
       "matches": [
         "https://edms.gulf.co.th/dms/drawing.asp*",
-        "http://edms.gulf.co.th/dms/drawing.asp*"
+        "http://edms.gulf.co.th/dms/drawing.asp*",
+        "https://edms.gulf.co.th/dms/login.asp*",
+        "http://edms.gulf.co.th/dms/login.asp*"
       ],
       "js": [
         "conzol.js"

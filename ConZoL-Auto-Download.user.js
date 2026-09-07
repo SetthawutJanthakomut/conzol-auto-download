@@ -1,10 +1,12 @@
 // ==UserScript==
 // @name         GULF ConZoL - Auto Download + Rename + Sort
 // @namespace    gmtp.conzol
-// @version      5.5
+// @version      5.6
 // @description  Download PDFs and native attachments from GULF ConZoL EDMS automatically - names each file and sorts it into the folder ConZoL assigns.
 // @match        https://edms.gulf.co.th/dms/drawing.asp*
 // @match        http://edms.gulf.co.th/dms/drawing.asp*
+// @match        https://edms.gulf.co.th/dms/login.asp*
+// @match        http://edms.gulf.co.th/dms/login.asp*
 // @updateURL    https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.user.js
 // @downloadURL  https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.user.js
 // @require      https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js
@@ -20,7 +22,7 @@
   // If a panel already exists the later copy stops here - otherwise ids collide and buttons stop responding
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '5.5';   // kept in sync with @version at build time
+  const VERSION = '5.6';   // kept in sync with @version at build time
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.user.js';   // filled in per language at build time
 
   // ---------------- Settings ----------------
@@ -64,6 +66,54 @@
 
   const $ = (t, p) => Object.assign(document.createElement(t), p || {});
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  // ---------------- The login page ----------------
+  // Chrome hides an autofilled password from page scripts until the page is actually clicked
+  // Clicking SIGN IN without that would post a blank password - a failed login, and a lockout risk
+  // So this only shows that the daily run is waiting; the one click it asks for is the key
+  if (/\/login\.asp/i.test(location.pathname)) {
+    const due = (() => {
+      try {
+        if (localStorage.getItem('edms_auto_v1') !== '1') return false;
+        const d = new Date();
+        const t = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        return localStorage.getItem('edms_autolast_v1') !== t;
+      } catch (e) { return false; }
+    })();
+    if (!due) return;
+    const bar = $('div');
+    bar.id = 'edmsdl-login';
+    bar.style.cssText = 'position:fixed;top:10px;right:10px;z-index:999999;width:290px;' +
+      'font:12px Tahoma,Verdana,sans-serif;background:#fff;color:#222;border:1px solid #b9a;' +
+      'border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.28);overflow:hidden';
+    bar.innerHTML = '<div style="background:#7a6a52;color:#fff;padding:6px 9px;font-weight:bold">' +
+      '⬇ ConZoL Auto Download</div><div style="padding:9px">' +
+      '<div id="edl-lmsg">Today\'s run is waiting - sign in and it starts on its own</div>' +
+      '<button id="edl-lgo" style="margin-top:8px;width:100%;font:12px Tahoma;padding:6px;cursor:pointer;' +
+      'border:1px solid #2c5c2c;border-radius:4px;background:#3d7a3d;color:#fff">Sign in and start today\'s run</button>' +
+      '</div>';
+    document.body.appendChild(bar);
+    const msg = bar.querySelector('#edl-lmsg');
+    bar.querySelector('#edl-lgo').onclick = async (ev) => {
+      ev.preventDefault();
+      const lg = document.getElementById('login');
+      const pw = document.getElementById('password');
+      const btn = [...document.querySelectorAll('input[type=submit]')].pop();
+      if (!lg || !pw || !btn) { msg.textContent = 'Could not find the login form - sign in as usual'; return; }
+      if (!lg.value.trim() || !pw.value) {
+        msg.textContent = 'Chrome has not filled the password - type it and press SIGN IN as usual, the run follows';
+        return;
+      }
+      // The page fetches a token key for the username on blur, then encrypts the password with it on submit
+      msg.textContent = 'Signing in …';
+      lg.dispatchEvent(new Event('blur'));
+      for (let i = 0; i < 40 && !window.mykey; i++) await sleep(200);
+      if (!window.mykey) { msg.textContent = 'The server did not return a token - press SIGN IN yourself'; return; }
+      btn.click();
+    };
+    return;
+  }
+
   const norm = (s) => String(s || '').toUpperCase().replace(/\s+/g, '').trim();
   const FSA = typeof window.showDirectoryPicker === 'function';
 
