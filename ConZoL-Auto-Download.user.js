@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GULF ConZoL - Auto Download + Rename + Sort
 // @namespace    gmtp.conzol
-// @version      5.4
+// @version      5.5
 // @description  Download PDFs and native attachments from GULF ConZoL EDMS automatically - names each file and sorts it into the folder ConZoL assigns.
 // @match        https://edms.gulf.co.th/dms/drawing.asp*
 // @match        http://edms.gulf.co.th/dms/drawing.asp*
@@ -20,7 +20,7 @@
   // If a panel already exists the later copy stops here - otherwise ids collide and buttons stop responding
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '5.4';   // kept in sync with @version at build time
+  const VERSION = '5.5';   // kept in sync with @version at build time
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.user.js';   // filled in per language at build time
 
   // ---------------- Settings ----------------
@@ -28,6 +28,8 @@
     delayMs: 500,          // pause between files
     searchDelayMs: 400,    // pause between search pages
     histDelayMs: 250,      // pause between fetching each document's revision history
+    // The watch list file, kept at the top of the destination folder
+    watchNames: ['watchlist.txt', 'watchlist.csv', 'watchlist.xlsx', 'note.txt'],
     retry: 1,
     maxNameLen: 180,
     supersededDir: '_Superseded',
@@ -615,6 +617,7 @@
     <div class="tabs" id="edl-tabs">
       <button data-p="dl" class="on">Download</button>
       <button data-p="list">Excel list</button>
+      <button data-p="auto">Daily</button>
       <button data-p="folder">Folder</button>
       <button data-p="opt">Options</button>
     </div>
@@ -657,6 +660,22 @@
           <div>discipline: <input id="edl-listdisc" style="width:200px;font:10px Consolas,monospace" placeholder="blank = every discipline · e.g. MA-DWG"></div>
         </fieldset>
         <button class="go2" id="edl-list">Build list (.xlsx)</button>
+      </div>
+
+      <div class="pane" data-p="auto">
+        <fieldset><legend>Watch list</legend>
+          <div class="hint">Put a <b>watchlist.txt</b> or <b>watchlist.xlsx</b> in the destination folder,
+            one entry per line - <code>GMTP-CAZ-COJ-MS</code>, <code>MA-DWG</code> - and start a
+            line with # for a note.</div>
+          <div id="edl-watchinfo" class="wn">Not read yet</div>
+          <button id="edl-watchread">Re-read the watch list</button>
+        </fieldset>
+        <fieldset><legend>Run on its own</legend>
+          <label><input type="checkbox" id="edl-auto"> Once a day, when the ConZoL page opens</label>
+          <div id="edl-autoinfo" class="hint">Has not run on its own yet</div>
+        </fieldset>
+        <button class="chk" id="edl-watchcheck">Check first (no download)</button>
+        <button class="go" id="edl-watchrun">Download the watch list now</button>
       </div>
 
       <div class="pane" data-p="folder">
@@ -1167,8 +1186,140 @@
             : '— Finished — press "Save CSV report" to keep the results');
     running = false;
   }
+  // ============ Once a day ============
+  const AUTO_KEY = 'edms_auto_v1', LAST_KEY = 'edms_autolast_v1';
+  const today = () => { const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+  const getLS = (k, d) => { try { return localStorage.getItem(k) || d; } catch (e) { return d; } };
+  const setLS = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+
+  function showAutoInfo(msg) {
+    const d = el('edl-autoinfo');
+    const last = getLS(LAST_KEY, '');
+    d.textContent = msg || (last ? 'Last automatic run: ' + last : 'Has not run on its own yet');
+  }
+  el('edl-auto').checked = getLS(AUTO_KEY, '') === '1';
+  el('edl-auto').onchange = () => { setLS(AUTO_KEY, el('edl-auto').checked ? '1' : '0'); showAutoInfo(); };
+  el('edl-watchread').onclick = () => showWatch();
+  el('edl-watchcheck').onclick = () => runWatch(true);
+  el('edl-watchrun').onclick = () => runWatch(false);
+  showAutoInfo();
+
+  // If the page opens and today's run has not happened yet, do it now
+  // Only run when write permission is already granted - never raise a prompt by surprise
+  (async () => {
+    if (getLS(AUTO_KEY, '') !== '1') return;
+    if (getLS(LAST_KEY, '') === today()) return;
+    await sleep(4000);
+    if (running || !rootDir) return;
+    if ((await rootDir.queryPermission({ mode: 'readwrite' })) !== 'granted') {
+      showAutoInfo('Waiting for folder permission - press \u201cDownload the watch list now\u201d once');
+      return;
+    }
+    const { names } = await readWatchList();
+    if (!names.length) { showAutoInfo('No watch list in the destination folder'); return; }
+    setLS(LAST_KEY, today()); showAutoInfo();
+    log('Starting the daily run …', 'wn');
+    await runWatch(false);
+  })();
+
   el('edl-runmdr').onclick = () => runMdr(false);
   el('edl-checkmdr').onclick = () => runMdr(true);
+
+  // ============ Watch list - the documents to follow every day ============
+  // A text or .xlsx file in the destination folder, one entry per line, e.g.
+  //   GMTP-CAZ-COJ-MS
+  //   MA-DWG
+  // Start a line with # for a note · separate entries with a comma or a new line
+  const splitWatch = (txt) => String(txt || '').split(/[\r\n,;\t]+/)
+    .map((x) => x.replace(/#.*$/, '').trim().toUpperCase())
+    .filter((x) => x.length >= 3 && /^[A-Z0-9][A-Z0-9\-]*$/.test(x));
+
+  async function readWatchList() {
+    if (!rootDir) return { names: [], file: '' };
+    for await (const entry of rootDir.values()) {
+      if (entry.kind !== 'file') continue;
+      if (!CFG.watchNames.some((n) => n.toLowerCase() === entry.name.toLowerCase())) continue;
+      const f = await entry.getFile();
+      if (/\.xlsx?$/i.test(entry.name)) {
+        await ensureXLSX();
+        const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' });
+        const out = [];
+        for (const sn of wb.SheetNames)
+          XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1 })
+            .forEach((row) => row.forEach((c) => out.push(...splitWatch(c))));
+        return { names: [...new Set(out)], file: entry.name };
+      }
+      return { names: [...new Set(splitWatch(await f.text()))], file: entry.name };
+    }
+    return { names: [], file: '' };
+  }
+
+  async function showWatch() {
+    const d = el('edl-watchinfo');
+    if (!rootDir) { d.className = 'wn'; d.textContent = 'No destination folder chosen'; return []; }
+    try {
+      const { names, file } = await readWatchList();
+      if (!file) {
+        d.className = 'wn';
+        d.textContent = 'No ' + CFG.watchNames.join(' / ') + ' in the destination folder';
+      } else if (!names.length) {
+        d.className = 'wn'; d.textContent = file + ' - read, but no document numbers in it';
+      } else {
+        d.className = 'ok'; d.textContent = file + ' — ' + names.length + ' entries: ' + names.join(', ');
+      }
+      return names;
+    } catch (e) { d.className = 'er'; d.textContent = 'Could not read the watch list: ' + e.message; return []; }
+  }
+
+  // Search ConZoL once per watch-list entry, then filter the rows again here
+  // (ConZoL's SEARCH box already matches on document ID, but this guards against a wide match)
+  async function collectWatchRows(names) {
+    const dstatus = el('edl-inactive').checked ? '' : 'A';
+    const index = new Map();
+    for (const q of names) {
+      if (stopFlag) break;
+      let page = 1, total = 1, got = 0;
+      do {
+        statusEl.textContent = `Searching ${q} - page ${page} …`;
+        const extra = { search: q, worktype: '', dstatus, page: String(page) };
+        if (page > 1) extra.pagechange = '1';
+        const { rows, pages } = await searchPage(extra);
+        total = Math.max(pages.length || 1, total);
+        rows.forEach((r) => {
+          if (!norm(r.doc).includes(norm(q))) return;
+          got++;
+          const k = norm(r.doc); if (!index.has(k)) index.set(k, r);
+        });
+        page++; await sleep(CFG.searchDelayMs);
+      } while (page <= total && !stopFlag);
+      log(`  · ${q} → ${got}`, got ? 'sk' : 'wn');
+    }
+    return [...index.values()];
+  }
+
+  async function runWatch(dry) {
+    if (running) return;
+    running = true; stopFlag = false; logEl.innerHTML = ''; lastReport = [];
+    if (dry) log('Check mode - nothing is downloaded, written or moved', 'wn');
+    await preflight();
+    try {
+      const names = await showWatch();
+      if (!names.length) { log('· The watch list is empty - nothing to do', 'er'); running = false; return; }
+      log(`Watch list - ${names.length} entries: ${names.join(', ')}`);
+      const items = await collectWatchRows(names);
+      log(`${items.length} documents found in ConZoL`, items.length ? 'ok' : 'er');
+      if (items.length) {
+        const s = await runDownload(items.map((r) => ({ ...r, sheet: 'watchlist' })), dry);
+        statusEl.textContent = (dry ? 'Check: would download ' : 'Done: downloaded ') + s.ok
+          + ` · skipped ${s.skipped}` + (dry ? '' : ` · failed ${s.fail}`)
+          + (s.sup ? ` · superseded ${s.sup}` : '');
+      } else statusEl.textContent = 'No documents matched the watch list';
+      showDirInfo();
+      log(dry ? '— Check finished (nothing downloaded) —' : '— Finished —');
+    } catch (e) { log('· The watch-list run failed: ' + e.message, 'er'); }
+    running = false;
+  }
 
   // ============ Mode 3 - build a document list as Excel ============
   // The title sits in the file name, after "<DocNo>-<Rev>_" and before the extension

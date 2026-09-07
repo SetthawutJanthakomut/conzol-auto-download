@@ -8,7 +8,7 @@
   // ถ้ามีกล่องอยู่แล้ว ให้ชุดที่มาทีหลังหยุดทำงาน ไม่งั้น id จะซ้ำและปุ่มจะกดไม่ติด
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '5.4';   // ซิงก์อัตโนมัติจาก @version ตอน build
+  const VERSION = '5.5';   // ซิงก์อัตโนมัติจาก @version ตอน build
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.th.user.js';   // build.py ใส่ให้ตามภาษา
 
   // ---------------- ตั้งค่าได้ตรงนี้ ----------------
@@ -16,6 +16,8 @@
     delayMs: 500,          // เว้นระยะระหว่างไฟล์
     searchDelayMs: 400,    // เว้นระยะระหว่างการค้นหน้า
     histDelayMs: 250,      // เว้นระยะระหว่างการดึงประวัติ Rev ของแต่ละเอกสาร
+    // ไฟล์รายการที่ต้องติดตาม วางไว้ที่โฟลเดอร์ปลายทางชั้นนอกสุด
+    watchNames: ['watchlist.txt', 'watchlist.csv', 'watchlist.xlsx', 'note.txt'],
     retry: 1,
     maxNameLen: 180,
     supersededDir: '_Superseded',
@@ -603,6 +605,7 @@
     <div class="tabs" id="edl-tabs">
       <button data-p="dl" class="on">โหลด</button>
       <button data-p="list">รายการ Excel</button>
+      <button data-p="auto">อัตโนมัติ</button>
       <button data-p="folder">โฟลเดอร์</button>
       <button data-p="opt">ตั้งค่า</button>
     </div>
@@ -645,6 +648,22 @@
           <div>discipline: <input id="edl-listdisc" style="width:200px;font:10px Consolas,monospace" placeholder="เว้นว่าง = ทุกอย่าง · เช่น MA-DWG"></div>
         </fieldset>
         <button class="go2" id="edl-list">สร้างไฟล์รายการ (.xlsx)</button>
+      </div>
+
+      <div class="pane" data-p="auto">
+        <fieldset><legend>รายการที่ต้องตาม (watchlist)</legend>
+          <div class="hint">วางไฟล์ <b>watchlist.txt</b> หรือ <b>watchlist.xlsx</b> ไว้ในโฟลเดอร์ปลายทาง
+            เขียนบรรทัดละอย่าง เช่น <code>GMTP-CAZ-COJ-MS</code> หรือ <code>MA-DWG</code>
+            (ใส่ # ข้างหน้าเพื่อทำหมายเหตุ)</div>
+          <div id="edl-watchinfo" class="wn">ยังไม่ได้อ่าน</div>
+          <button id="edl-watchread">อ่าน watchlist ใหม่</button>
+        </fieldset>
+        <fieldset><legend>ทำอัตโนมัติ</legend>
+          <label><input type="checkbox" id="edl-auto"> ทำเองวันละครั้ง ตอนเปิดหน้า ConZoL</label>
+          <div id="edl-autoinfo" class="hint">ยังไม่เคยรันอัตโนมัติ</div>
+        </fieldset>
+        <button class="chk" id="edl-watchcheck">เช็คก่อน (ไม่โหลดจริง)</button>
+        <button class="go" id="edl-watchrun">โหลดตาม watchlist เดี๋ยวนี้</button>
       </div>
 
       <div class="pane" data-p="folder">
@@ -1155,8 +1174,140 @@
             : '— จบการทำงาน — กด "บันทึกรายงาน CSV" เพื่อเก็บผล');
     running = false;
   }
+  // ============ อัตโนมัติวันละครั้ง ============
+  const AUTO_KEY = 'edms_auto_v1', LAST_KEY = 'edms_autolast_v1';
+  const today = () => { const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+  const getLS = (k, d) => { try { return localStorage.getItem(k) || d; } catch (e) { return d; } };
+  const setLS = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+
+  function showAutoInfo(msg) {
+    const d = el('edl-autoinfo');
+    const last = getLS(LAST_KEY, '');
+    d.textContent = msg || (last ? 'รันอัตโนมัติล่าสุด: ' + last : 'ยังไม่เคยรันอัตโนมัติ');
+  }
+  el('edl-auto').checked = getLS(AUTO_KEY, '') === '1';
+  el('edl-auto').onchange = () => { setLS(AUTO_KEY, el('edl-auto').checked ? '1' : '0'); showAutoInfo(); };
+  el('edl-watchread').onclick = () => showWatch();
+  el('edl-watchcheck').onclick = () => runWatch(true);
+  el('edl-watchrun').onclick = () => runWatch(false);
+  showAutoInfo();
+
+  // เปิดหน้ามาแล้วยังไม่ได้รันวันนี้ ก็รันให้เลย
+  // เขียนไฟล์ได้เฉพาะตอนที่สิทธิ์เป็น granted อยู่แล้ว ถ้ายังต้องกดอนุญาตจะไม่แอบเด้ง
+  (async () => {
+    if (getLS(AUTO_KEY, '') !== '1') return;
+    if (getLS(LAST_KEY, '') === today()) return;
+    await sleep(4000);
+    if (running || !rootDir) return;
+    if ((await rootDir.queryPermission({ mode: 'readwrite' })) !== 'granted') {
+      showAutoInfo('รอสิทธิ์เขียนโฟลเดอร์ — กด “โหลดตาม watchlist เดี๋ยวนี้” หนึ่งครั้ง');
+      return;
+    }
+    const { names } = await readWatchList();
+    if (!names.length) { showAutoInfo('ยังไม่มี watchlist ในโฟลเดอร์ปลายทาง'); return; }
+    setLS(LAST_KEY, today()); showAutoInfo();
+    log('เริ่มทำงานอัตโนมัติประจำวัน …', 'wn');
+    await runWatch(false);
+  })();
+
   el('edl-runmdr').onclick = () => runMdr(false);
   el('edl-checkmdr').onclick = () => runMdr(true);
+
+  // ============ Watch list — เลขเอกสารที่ต้องตามทุกวัน ============
+  // ไฟล์ข้อความหรือ .xlsx ที่วางไว้ในโฟลเดอร์ปลายทาง เขียนบรรทัดละอย่าง เช่น
+  //   GMTP-CAZ-COJ-MS
+  //   MA-DWG
+  // ใส่ # ข้างหน้าเพื่อทำเป็นหมายเหตุ · คั่นด้วย , หรือขึ้นบรรทัดใหม่ก็ได้
+  const splitWatch = (txt) => String(txt || '').split(/[\r\n,;\t]+/)
+    .map((x) => x.replace(/#.*$/, '').trim().toUpperCase())
+    .filter((x) => x.length >= 3 && /^[A-Z0-9][A-Z0-9\-]*$/.test(x));
+
+  async function readWatchList() {
+    if (!rootDir) return { names: [], file: '' };
+    for await (const entry of rootDir.values()) {
+      if (entry.kind !== 'file') continue;
+      if (!CFG.watchNames.some((n) => n.toLowerCase() === entry.name.toLowerCase())) continue;
+      const f = await entry.getFile();
+      if (/\.xlsx?$/i.test(entry.name)) {
+        await ensureXLSX();
+        const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' });
+        const out = [];
+        for (const sn of wb.SheetNames)
+          XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1 })
+            .forEach((row) => row.forEach((c) => out.push(...splitWatch(c))));
+        return { names: [...new Set(out)], file: entry.name };
+      }
+      return { names: [...new Set(splitWatch(await f.text()))], file: entry.name };
+    }
+    return { names: [], file: '' };
+  }
+
+  async function showWatch() {
+    const d = el('edl-watchinfo');
+    if (!rootDir) { d.className = 'wn'; d.textContent = 'ยังไม่ได้เลือกโฟลเดอร์ปลายทาง'; return []; }
+    try {
+      const { names, file } = await readWatchList();
+      if (!file) {
+        d.className = 'wn';
+        d.textContent = 'ยังไม่มีไฟล์ ' + CFG.watchNames.join(' / ') + ' ในโฟลเดอร์ปลายทาง';
+      } else if (!names.length) {
+        d.className = 'wn'; d.textContent = file + ' — อ่านแล้วไม่เจอเลขเอกสาร';
+      } else {
+        d.className = 'ok'; d.textContent = file + ' — ' + names.length + ' รายการ: ' + names.join(', ');
+      }
+      return names;
+    } catch (e) { d.className = 'er'; d.textContent = 'อ่าน watchlist ไม่ได้: ' + e.message; return []; }
+  }
+
+  // ค้น ConZoL ทีละรายการใน watchlist แล้วกรองซ้ำอีกชั้นด้วยตัวเอง
+  // (ช่อง SEARCH ของ ConZoL ค้นจาก DOCUMENT ID อยู่แล้ว แต่กันไว้เผื่อคืนมากว้างไป)
+  async function collectWatchRows(names) {
+    const dstatus = el('edl-inactive').checked ? '' : 'A';
+    const index = new Map();
+    for (const q of names) {
+      if (stopFlag) break;
+      let page = 1, total = 1, got = 0;
+      do {
+        statusEl.textContent = `ค้น ${q} หน้า ${page} …`;
+        const extra = { search: q, worktype: '', dstatus, page: String(page) };
+        if (page > 1) extra.pagechange = '1';
+        const { rows, pages } = await searchPage(extra);
+        total = Math.max(pages.length || 1, total);
+        rows.forEach((r) => {
+          if (!norm(r.doc).includes(norm(q))) return;
+          got++;
+          const k = norm(r.doc); if (!index.has(k)) index.set(k, r);
+        });
+        page++; await sleep(CFG.searchDelayMs);
+      } while (page <= total && !stopFlag);
+      log(`  · ${q} → ${got}`, got ? 'sk' : 'wn');
+    }
+    return [...index.values()];
+  }
+
+  async function runWatch(dry) {
+    if (running) return;
+    running = true; stopFlag = false; logEl.innerHTML = ''; lastReport = [];
+    if (dry) log('โหมดเช็คก่อน — ไม่มีการเขียนหรือย้ายไฟล์จริง', 'wn');
+    await preflight();
+    try {
+      const names = await showWatch();
+      if (!names.length) { log('· watchlist ว่าง — ยังไม่มีอะไรให้ทำ', 'er'); running = false; return; }
+      log(`watchlist ${names.length} รายการ: ${names.join(', ')}`);
+      const items = await collectWatchRows(names);
+      log(`พบใน ConZoL ${items.length} เอกสาร`, items.length ? 'ok' : 'er');
+      if (items.length) {
+        const s = await runDownload(items.map((r) => ({ ...r, sheet: 'watchlist' })), dry);
+        statusEl.textContent = (dry ? 'ผลการเช็ค: จะโหลด ' : 'เสร็จ: สำเร็จ ') + s.ok
+          + ` · ข้าม ${s.skipped}` + (dry ? '' : ` · ผิดพลาด ${s.fail}`)
+          + (s.sup ? ` · เก่า→_Superseded ${s.sup}` : '');
+      } else statusEl.textContent = 'ไม่พบเอกสารตาม watchlist';
+      showDirInfo();
+      log(dry ? '— จบการเช็ค (ยังไม่ได้โหลด) —' : '— จบการทำงาน —');
+    } catch (e) { log('· ทำงานตาม watchlist ไม่สำเร็จ: ' + e.message, 'er'); }
+    running = false;
+  }
 
   // ============ โหมด 3 — ทำรายการเอกสารเป็น Excel ============
   // ชื่อเรื่องอยู่ในชื่อไฟล์ หลัง "<DocNo>-<Rev>_" จนถึงนามสกุล

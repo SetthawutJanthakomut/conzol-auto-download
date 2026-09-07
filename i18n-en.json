@@ -886,5 +886,161 @@
  [
   ">พร้อมทำงาน</span>",
   ">Ready</span>"
+ ],
+ [
+  "// ไฟล์รายการที่ต้องติดตาม วางไว้ที่โฟลเดอร์ปลายทางชั้นนอกสุด",
+  "// The watch list file, kept at the top of the destination folder"
+ ],
+ [
+  "<button data-p=\"auto\">อัตโนมัติ</button>",
+  "<button data-p=\"auto\">Daily</button>"
+ ],
+ [
+  "<legend>รายการที่ต้องตาม (watchlist)</legend>",
+  "<legend>Watch list</legend>"
+ ],
+ [
+  "<div class=\"hint\">วางไฟล์ <b>watchlist.txt</b> หรือ <b>watchlist.xlsx</b> ไว้ในโฟลเดอร์ปลายทาง\n            เขียนบรรทัดละอย่าง เช่น <code>GMTP-CAZ-COJ-MS</code> หรือ <code>MA-DWG</code>\n            (ใส่ # ข้างหน้าเพื่อทำหมายเหตุ)</div>",
+  "<div class=\"hint\">Put a <b>watchlist.txt</b> or <b>watchlist.xlsx</b> in the destination folder,\n            one entry per line - <code>GMTP-CAZ-COJ-MS</code>, <code>MA-DWG</code> - and start a\n            line with # for a note.</div>"
+ ],
+ [
+  "<div id=\"edl-watchinfo\" class=\"wn\">ยังไม่ได้อ่าน</div>",
+  "<div id=\"edl-watchinfo\" class=\"wn\">Not read yet</div>"
+ ],
+ [
+  ">อ่าน watchlist ใหม่</button>",
+  ">Re-read the watch list</button>"
+ ],
+ [
+  "<legend>ทำอัตโนมัติ</legend>",
+  "<legend>Run on its own</legend>"
+ ],
+ [
+  " ทำเองวันละครั้ง ตอนเปิดหน้า ConZoL</label>",
+  " Once a day, when the ConZoL page opens</label>"
+ ],
+ [
+  "<div id=\"edl-autoinfo\" class=\"hint\">ยังไม่เคยรันอัตโนมัติ</div>",
+  "<div id=\"edl-autoinfo\" class=\"hint\">Has not run on its own yet</div>"
+ ],
+ [
+  ">โหลดตาม watchlist เดี๋ยวนี้</button>",
+  ">Download the watch list now</button>"
+ ],
+ [
+  "// ============ อัตโนมัติวันละครั้ง ============",
+  "// ============ Once a day ============"
+ ],
+ [
+  "'รันอัตโนมัติล่าสุด: '",
+  "'Last automatic run: '"
+ ],
+ [
+  "'ยังไม่เคยรันอัตโนมัติ'",
+  "'Has not run on its own yet'"
+ ],
+ [
+  "// เปิดหน้ามาแล้วยังไม่ได้รันวันนี้ ก็รันให้เลย",
+  "// If the page opens and today's run has not happened yet, do it now"
+ ],
+ [
+  "// เขียนไฟล์ได้เฉพาะตอนที่สิทธิ์เป็น granted อยู่แล้ว ถ้ายังต้องกดอนุญาตจะไม่แอบเด้ง",
+  "// Only run when write permission is already granted - never raise a prompt by surprise"
+ ],
+ [
+  "showAutoInfo('รอสิทธิ์เขียนโฟลเดอร์ — กด “โหลดตาม watchlist เดี๋ยวนี้” หนึ่งครั้ง');",
+  "showAutoInfo('Waiting for folder permission - press \\u201cDownload the watch list now\\u201d once');"
+ ],
+ [
+  "showAutoInfo('ยังไม่มี watchlist ในโฟลเดอร์ปลายทาง');",
+  "showAutoInfo('No watch list in the destination folder');"
+ ],
+ [
+  "log('เริ่มทำงานอัตโนมัติประจำวัน …', 'wn');",
+  "log('Starting the daily run …', 'wn');"
+ ],
+ [
+  "// ============ Watch list — เลขเอกสารที่ต้องตามทุกวัน ============",
+  "// ============ Watch list - the documents to follow every day ============"
+ ],
+ [
+  "// ไฟล์ข้อความหรือ .xlsx ที่วางไว้ในโฟลเดอร์ปลายทาง เขียนบรรทัดละอย่าง เช่น",
+  "// A text or .xlsx file in the destination folder, one entry per line, e.g."
+ ],
+ [
+  "// ใส่ # ข้างหน้าเพื่อทำเป็นหมายเหตุ · คั่นด้วย , หรือขึ้นบรรทัดใหม่ก็ได้",
+  "// Start a line with # for a note · separate entries with a comma or a new line"
+ ],
+ [
+  "'ยังไม่ได้เลือกโฟลเดอร์ปลายทาง'",
+  "'No destination folder chosen'"
+ ],
+ [
+  "' ในโฟลเดอร์ปลายทาง'",
+  "' in the destination folder'"
+ ],
+ [
+  "'ยังไม่มีไฟล์ '",
+  "'No '"
+ ],
+ [
+  "' — อ่านแล้วไม่เจอเลขเอกสาร'",
+  "' - read, but no document numbers in it'"
+ ],
+ [
+  "' รายการ: '",
+  "' entries: '"
+ ],
+ [
+  "'อ่าน watchlist ไม่ได้: '",
+  "'Could not read the watch list: '"
+ ],
+ [
+  "// ค้น ConZoL ทีละรายการใน watchlist แล้วกรองซ้ำอีกชั้นด้วยตัวเอง",
+  "// Search ConZoL once per watch-list entry, then filter the rows again here"
+ ],
+ [
+  "// (ช่อง SEARCH ของ ConZoL ค้นจาก DOCUMENT ID อยู่แล้ว แต่กันไว้เผื่อคืนมากว้างไป)",
+  "// (ConZoL's SEARCH box already matches on document ID, but this guards against a wide match)"
+ ],
+ [
+  "`ค้น ${q} หน้า ${page} …`",
+  "`Searching ${q} - page ${page} …`"
+ ],
+ [
+  "'· watchlist ว่าง — ยังไม่มีอะไรให้ทำ'",
+  "'· The watch list is empty - nothing to do'"
+ ],
+ [
+  "`watchlist ${names.length} รายการ: ${names.join(', ')}`",
+  "`Watch list - ${names.length} entries: ${names.join(', ')}`"
+ ],
+ [
+  "`พบใน ConZoL ${items.length} เอกสาร`",
+  "`${items.length} documents found in ConZoL`"
+ ],
+ [
+  "(dry ? 'ผลการเช็ค: จะโหลด ' : 'เสร็จ: สำเร็จ ')",
+  "(dry ? 'Check: would download ' : 'Done: downloaded ')"
+ ],
+ [
+  "` · ข้าม ${s.skipped}`",
+  "` · skipped ${s.skipped}`"
+ ],
+ [
+  "(dry ? '' : ` · ผิดพลาด ${s.fail}`)",
+  "(dry ? '' : ` · failed ${s.fail}`)"
+ ],
+ [
+  "'ไม่พบเอกสารตาม watchlist'",
+  "'No documents matched the watch list'"
+ ],
+ [
+  "log(dry ? '— จบการเช็ค (ยังไม่ได้โหลด) —' : '— Finished —');",
+  "log(dry ? '— Check finished (nothing downloaded) —' : '— Finished —');"
+ ],
+ [
+  "'· ทำงานตาม watchlist ไม่สำเร็จ: '",
+  "'· The watch-list run failed: '"
  ]
 ]

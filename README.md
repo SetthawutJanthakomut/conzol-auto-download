@@ -104,6 +104,25 @@ it never overwrites the full list.
 Leave the discipline box empty for every discipline in ConZoL's dropdown, or type the ones you want
 (`MA-DWG, MA-CAL`). It reads like an MDR and opens straight in Excel.
 
+### Every day, on its own
+
+Put a **watchlist.txt** (or `.xlsx`) in the destination folder, one entry per line:
+
+```
+# a line starting with # is a note
+GMTP-CAZ-COJ-MS
+MA-DWG
+MA-CAL
+```
+
+Each line is matched against the document number, so a prefix or a middle piece both work. On the
+**Daily** tab, tick *Once a day, when the ConZoL page opens* — the next time you open ConZoL on a new
+day, the panel searches ConZoL for every entry and downloads whatever is new or has a newer revision.
+It runs only when write permission to the folder is already granted, so it never raises a prompt you
+did not ask for; if permission has lapsed, press **Download the watch list now** once and it resumes.
+
+This needs Chrome open and a ConZoL session — a page script cannot run with the browser closed.
+
 **Re-sort folders** tidies files already on disk.
 
 ---
@@ -262,6 +281,26 @@ ConZoL เก็บประวัติทุก Rev ของแต่ละ�
 
 ช่อง discipline เว้นว่าง = ไล่ทุกอย่างที่มีใน dropdown ของ ConZoL หรือพิมพ์เฉพาะที่ต้องการก็ได้
 (`MA-DWG, MA-CAL`) หน้าตาอ่านง่ายคล้าย MDR เปิดใน Excel ได้เลย
+
+### ทำเองทุกวัน
+
+วางไฟล์ **watchlist.txt** (หรือ `.xlsx`) ไว้ในโฟลเดอร์ปลายทาง บรรทัดละรายการ
+
+```
+# บรรทัดที่ขึ้นต้นด้วย # คือหมายเหตุ
+GMTP-CAZ-COJ-MS
+MA-DWG
+MA-CAL
+```
+
+แต่ละบรรทัดเอาไปเทียบกับเลขเอกสาร จะใส่เป็นต้นเลขหรือท่อนกลางก็ได้ แล้วที่แท็บ **อัตโนมัติ**
+ติ๊ก *ทำเองวันละครั้ง ตอนเปิดหน้า ConZoL* — วันใหม่พอเปิด ConZoL กล่องจะไปค้นทุกรายการใน watchlist
+แล้วโหลดเฉพาะที่ยังไม่มีหรือ Rev ใหม่กว่าให้เอง
+
+จะทำงานก็ต่อเมื่อสิทธิ์เขียนโฟลเดอร์ยังอยู่ ไม่มีการเด้งขออนุญาตเอง ถ้าสิทธิ์หลุด
+กด **โหลดตาม watchlist เดี๋ยวนี้** หนึ่งครั้งก็กลับมาทำงานต่อ
+
+ข้อจำกัด: ต้องเปิด Chrome และล็อกอิน ConZoL ค้างไว้ — สคริปต์ที่รันในหน้าเว็บทำงานตอนปิดเบราว์เซอร์ไม่ได้
 
 ปุ่ม **จัดโฟลเดอร์ใหม่** ใช้จัดไฟล์เก่าที่กองอยู่ให้เข้าที่
 
