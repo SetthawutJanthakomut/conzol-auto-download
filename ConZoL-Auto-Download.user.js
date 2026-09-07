@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GULF ConZoL - Auto Download + Rename + Sort
 // @namespace    gmtp.conzol
-// @version      5.8
+// @version      5.9
 // @description  Download PDFs and native attachments from GULF ConZoL EDMS automatically - names each file and sorts it into the folder ConZoL assigns.
 // @match        https://edms.gulf.co.th/dms/drawing.asp*
 // @match        http://edms.gulf.co.th/dms/drawing.asp*
@@ -22,7 +22,7 @@
   // If a panel already exists the later copy stops here - otherwise ids collide and buttons stop responding
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '5.8';   // kept in sync with @version at build time
+  const VERSION = '5.9';   // kept in sync with @version at build time
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.user.js';   // filled in per language at build time
 
   // ---------------- Settings ----------------
@@ -662,6 +662,8 @@
       #edmsdl .hint{color:#888;margin:0 0 5px}
       #edmsdl .dirbar{flex:0 0 auto;padding:4px 9px;background:#f7f4ee;border-bottom:1px solid #e3dbcc;
         font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      #edmsdl .dirbar.go{background:#e6f2e6;color:#245c24;font-weight:bold;font-size:11px;
+        cursor:pointer;white-space:normal;padding:7px 9px}
     </style>
     <div class="hd"><span>⬇ ConZoL Auto Download <span class="ver" id="edl-ver">v${VERSION}</span></span><span class="x" id="edl-min">–</span></div>
     <div class="tabs" id="edl-tabs">
@@ -790,8 +792,19 @@
   })();
 
   // ---- destination folder ----
+  // Chrome only lets a page ask for folder write access from a real click
+  // A fresh browser session resets it to prompt, so it cannot be asked for on page load
+  // so the folder strip - visible on every tab - turns into a one-press button instead
+  function askBar(text, fn) {
+    const d = el('edl-dirinfo');
+    d.className = 'dirbar go';
+    d.textContent = text;
+    d.onclick = async () => { d.onclick = null; d.className = 'dirbar'; await fn(); };
+  }
+
   function showDirInfo(extra) {
     const d = el('edl-dirinfo');
+    d.onclick = null;
     if (!rootDir) {
       d.className = 'dirbar wn';
       d.textContent = FSA ? 'No folder chosen - files will go to Downloads'
@@ -1273,7 +1286,7 @@
 
   el('edl-auto').checked = getLS(AUTO_KEY, '') === '1';
   el('edl-auto').onchange = () => { setLS(AUTO_KEY, el('edl-auto').checked ? '1' : '0'); showAutoInfo(); };
-  el('edl-watchread').onclick = () => showWatch();
+  el('edl-watchread').onclick = async () => { await ensurePermission(); showDirInfo(); showWatch(); };
   el('edl-watchcheck').onclick = () => runWatch(true);
   el('edl-watchrun').onclick = () => runWatch(false);
   showAutoInfo();
@@ -1286,7 +1299,13 @@
     await sleep(4000);
     if (running || !rootDir) return;
     if ((await rootDir.queryPermission({ mode: 'readwrite' })) !== 'granted') {
-      showAutoInfo('Waiting for folder permission - press \u201cDownload the watch list now\u201d once');
+      showAutoInfo('Waiting for folder permission');
+      askBar('▶ Press here to allow the folder and start today\u2019s run', async () => {
+        if (!(await ensurePermission())) { showDirInfo(); log('· Write permission denied', 'er'); return; }
+        showDirInfo();
+        setLS(LAST_KEY, today()); showAutoInfo();
+        await runWatch(false);
+      });
       return;
     }
     const { names } = await readWatchList();
@@ -1331,6 +1350,11 @@
   async function showWatch() {
     const d = el('edl-watchinfo');
     if (!rootDir) { d.className = 'wn'; d.textContent = 'No destination folder chosen'; return []; }
+    if ((await rootDir.queryPermission({ mode: 'readwrite' })) !== 'granted') {
+      d.className = 'wn';
+      d.textContent = 'Folder write access has not been granted - press a button below once';
+      return [];
+    }
     try {
       const { names, file } = await readWatchList();
       if (!file) {

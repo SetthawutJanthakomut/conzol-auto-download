@@ -8,7 +8,7 @@
   // ถ้ามีกล่องอยู่แล้ว ให้ชุดที่มาทีหลังหยุดทำงาน ไม่งั้น id จะซ้ำและปุ่มจะกดไม่ติด
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '5.8';   // ซิงก์อัตโนมัติจาก @version ตอน build
+  const VERSION = '5.9';   // ซิงก์อัตโนมัติจาก @version ตอน build
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.th.user.js';   // build.py ใส่ให้ตามภาษา
 
   // ---------------- ตั้งค่าได้ตรงนี้ ----------------
@@ -648,6 +648,8 @@
       #edmsdl .hint{color:#888;margin:0 0 5px}
       #edmsdl .dirbar{flex:0 0 auto;padding:4px 9px;background:#f7f4ee;border-bottom:1px solid #e3dbcc;
         font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      #edmsdl .dirbar.go{background:#e6f2e6;color:#245c24;font-weight:bold;font-size:11px;
+        cursor:pointer;white-space:normal;padding:7px 9px}
     </style>
     <div class="hd"><span>⬇ ConZoL Auto Download <span class="ver" id="edl-ver">v${VERSION}</span></span><span class="x" id="edl-min">–</span></div>
     <div class="tabs" id="edl-tabs">
@@ -776,8 +778,19 @@
   })();
 
   // ---- โฟลเดอร์ปลายทาง ----
+  // Chrome ให้ขอสิทธิ์เขียนโฟลเดอร์ได้เฉพาะตอนที่มีคนคลิกจริง ๆ เท่านั้น
+  // พอเปิดเบราว์เซอร์ใหม่สิทธิ์จะกลับไปเป็น prompt ทุกครั้ง เรียกเองตอนโหลดหน้าไม่ได้
+  // เลยเปลี่ยนแถบโฟลเดอร์ (ซึ่งเห็นอยู่ทุกแท็บ) ให้เป็นปุ่มกดครั้งเดียวแทน
+  function askBar(text, fn) {
+    const d = el('edl-dirinfo');
+    d.className = 'dirbar go';
+    d.textContent = text;
+    d.onclick = async () => { d.onclick = null; d.className = 'dirbar'; await fn(); };
+  }
+
   function showDirInfo(extra) {
     const d = el('edl-dirinfo');
+    d.onclick = null;
     if (!rootDir) {
       d.className = 'dirbar wn';
       d.textContent = FSA ? 'ยังไม่ได้เลือกโฟลเดอร์ (จะเซฟลง Downloads แทน)'
@@ -1259,7 +1272,7 @@
 
   el('edl-auto').checked = getLS(AUTO_KEY, '') === '1';
   el('edl-auto').onchange = () => { setLS(AUTO_KEY, el('edl-auto').checked ? '1' : '0'); showAutoInfo(); };
-  el('edl-watchread').onclick = () => showWatch();
+  el('edl-watchread').onclick = async () => { await ensurePermission(); showDirInfo(); showWatch(); };
   el('edl-watchcheck').onclick = () => runWatch(true);
   el('edl-watchrun').onclick = () => runWatch(false);
   showAutoInfo();
@@ -1272,7 +1285,13 @@
     await sleep(4000);
     if (running || !rootDir) return;
     if ((await rootDir.queryPermission({ mode: 'readwrite' })) !== 'granted') {
-      showAutoInfo('รอสิทธิ์เขียนโฟลเดอร์ — กด “โหลดตาม watchlist เดี๋ยวนี้” หนึ่งครั้ง');
+      showAutoInfo('รอกดอนุญาตโฟลเดอร์');
+      askBar('▶ กดที่นี่ เพื่ออนุญาตโฟลเดอร์แล้วเริ่มงานประจำวัน', async () => {
+        if (!(await ensurePermission())) { showDirInfo(); log('· ไม่ได้รับสิทธิ์เขียนโฟลเดอร์', 'er'); return; }
+        showDirInfo();
+        setLS(LAST_KEY, today()); showAutoInfo();
+        await runWatch(false);
+      });
       return;
     }
     const { names } = await readWatchList();
@@ -1317,6 +1336,11 @@
   async function showWatch() {
     const d = el('edl-watchinfo');
     if (!rootDir) { d.className = 'wn'; d.textContent = 'ยังไม่ได้เลือกโฟลเดอร์ปลายทาง'; return []; }
+    if ((await rootDir.queryPermission({ mode: 'readwrite' })) !== 'granted') {
+      d.className = 'wn';
+      d.textContent = 'ยังไม่ได้อนุญาตให้เขียนโฟลเดอร์ — กดปุ่มด้านล่างหนึ่งครั้ง';
+      return [];
+    }
     try {
       const { names, file } = await readWatchList();
       if (!file) {

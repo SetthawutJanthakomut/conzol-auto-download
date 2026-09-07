@@ -948,10 +948,6 @@
   "// Only run when write permission is already granted - never raise a prompt by surprise"
  ],
  [
-  "showAutoInfo('รอสิทธิ์เขียนโฟลเดอร์ — กด “โหลดตาม watchlist เดี๋ยวนี้” หนึ่งครั้ง');",
-  "showAutoInfo('Waiting for folder permission - press \\u201cDownload the watch list now\\u201d once');"
- ],
- [
   "showAutoInfo('ยังไม่มี watchlist ในโฟลเดอร์ปลายทาง');",
   "showAutoInfo('No watch list in the destination folder');"
  ],
@@ -1106,5 +1102,29 @@
  [
   "// จำค่าช่องติ๊กไว้ เปิดหน้าใหม่หรือวันรุ่งขึ้นก็ยังเป็นค่าที่ตั้งไว้",
   "// Remember the checkboxes, so a new page or the next morning keeps the same settings"
+ ],
+ [
+  "// Chrome ให้ขอสิทธิ์เขียนโฟลเดอร์ได้เฉพาะตอนที่มีคนคลิกจริง ๆ เท่านั้น",
+  "// Chrome only lets a page ask for folder write access from a real click"
+ ],
+ [
+  "// พอเปิดเบราว์เซอร์ใหม่สิทธิ์จะกลับไปเป็น prompt ทุกครั้ง เรียกเองตอนโหลดหน้าไม่ได้",
+  "// A fresh browser session resets it to prompt, so it cannot be asked for on page load"
+ ],
+ [
+  "// เลยเปลี่ยนแถบโฟลเดอร์ (ซึ่งเห็นอยู่ทุกแท็บ) ให้เป็นปุ่มกดครั้งเดียวแทน",
+  "// so the folder strip - visible on every tab - turns into a one-press button instead"
+ ],
+ [
+  "'ยังไม่ได้อนุญาตให้เขียนโฟลเดอร์ — กดปุ่มด้านล่างหนึ่งครั้ง'",
+  "'Folder write access has not been granted - press a button below once'"
+ ],
+ [
+  "showAutoInfo('รอกดอนุญาตโฟลเดอร์');",
+  "showAutoInfo('Waiting for folder permission');"
+ ],
+ [
+  "askBar('▶ กดที่นี่ เพื่ออนุญาตโฟลเดอร์แล้วเริ่มงานประจำวัน', async () => {",
+  "askBar('▶ Press here to allow the folder and start today\\u2019s run', async () => {"
  ]
 ]

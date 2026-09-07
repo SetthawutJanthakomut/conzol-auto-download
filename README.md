@@ -118,8 +118,11 @@ MA-CAL
 Each line is matched against the document number, so a prefix or a middle piece both work. On the
 **Daily** tab, tick *Once a day, when the ConZoL page opens* — the next time you open ConZoL on a new
 day, the panel searches ConZoL for every entry and downloads whatever is new or has a newer revision.
-It runs only when write permission to the folder is already granted, so it never raises a prompt you
-did not ask for; if permission has lapsed, press **Download the watch list now** once and it resumes.
+Chrome resets folder write access every time the browser restarts, and only lets a page ask for it
+back from a real click — so on the first ConZoL page of a new browser session the folder strip turns
+into a green button: **Press here to allow the folder and start today's run**. One press grants the
+folder and runs the day's download. It is the same strip on every tab, so there is nothing to hunt for.
+If Chrome's permission dialog offers to remember the choice, taking it removes even that press.
 
 If the ConZoL session has expired the page shows its login form instead, and the panel puts a small
 bar in the corner — press **Sign in and start today's run** once and the rest continues on its own.
@@ -307,8 +310,10 @@ MA-CAL
 ติ๊ก *ทำเองวันละครั้ง ตอนเปิดหน้า ConZoL* — วันใหม่พอเปิด ConZoL กล่องจะไปค้นทุกรายการใน watchlist
 แล้วโหลดเฉพาะที่ยังไม่มีหรือ Rev ใหม่กว่าให้เอง
 
-จะทำงานก็ต่อเมื่อสิทธิ์เขียนโฟลเดอร์ยังอยู่ ไม่มีการเด้งขออนุญาตเอง ถ้าสิทธิ์หลุด
-กด **โหลดตาม watchlist เดี๋ยวนี้** หนึ่งครั้งก็กลับมาทำงานต่อ
+Chrome คืนสิทธิ์เขียนโฟลเดอร์ทุกครั้งที่เปิดเบราว์เซอร์ใหม่ และยอมให้ขอคืนได้เฉพาะตอนมีคนคลิกจริง
+พอเปิดหน้า ConZoL ครั้งแรกของเบราว์เซอร์รอบใหม่ แถบโฟลเดอร์จะกลายเป็นปุ่มเขียว
+**กดที่นี่ เพื่ออนุญาตโฟลเดอร์แล้วเริ่มงานประจำวัน** กดครั้งเดียวได้ทั้งสิทธิ์และงานประจำวัน
+แถบนี้เห็นทุกแท็บ ไม่ต้องหา ถ้ากล่องขออนุญาตของ Chrome มีตัวเลือกให้จำไว้ เลือกไว้ก็ไม่ต้องกดอีกเลย
 
 ถ้า session ของ ConZoL หมดอายุ หน้าเว็บจะขึ้นฟอร์มล็อกอินแทน กล่องจะขึ้นแถบเล็ก ๆ มุมจอ
 กด **เข้าระบบแล้วเริ่มงานประจำวัน** ครั้งเดียว ที่เหลือทำต่อเอง
