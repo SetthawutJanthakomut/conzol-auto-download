@@ -121,7 +121,11 @@ day, the panel searches ConZoL for every entry and downloads whatever is new or 
 It runs only when write permission to the folder is already granted, so it never raises a prompt you
 did not ask for; if permission has lapsed, press **Download the watch list now** once and it resumes.
 
-This needs Chrome open and a ConZoL session — a page script cannot run with the browser closed.
+This needs Chrome open and a ConZoL session — a page script cannot run with the browser closed. To
+get closer to hands-off on Windows, [`windows/`](windows) has a Task Scheduler job that opens ConZoL in
+a named Chrome profile each morning, and the daily run then happens on its own: run
+`windows\Install-Task.bat` once (no administrator rights needed). The Chrome profile is looked up by
+its display name, so it keeps working when Chrome renumbers its profile folders.
 
 **Re-sort folders** tidies files already on disk.
 
@@ -301,6 +305,10 @@ MA-CAL
 กด **โหลดตาม watchlist เดี๋ยวนี้** หนึ่งครั้งก็กลับมาทำงานต่อ
 
 ข้อจำกัด: ต้องเปิด Chrome และล็อกอิน ConZoL ค้างไว้ — สคริปต์ที่รันในหน้าเว็บทำงานตอนปิดเบราว์เซอร์ไม่ได้
+ถ้าอยากให้ใกล้เคียงอัตโนมัติเต็มตัวบน Windows ในโฟลเดอร์ [`windows/`](windows) มีชุดตั้ง Task Scheduler
+ที่เปิด ConZoL ด้วยโปรไฟล์ Chrome ที่ระบุไว้ทุกเช้า แล้วตัวโหลดประจำวันจะทำงานต่อเอง —
+ดับเบิลคลิก `windows\Install-Task.bat` ครั้งเดียว ไม่ต้องใช้สิทธิ์ผู้ดูแลระบบ
+โปรไฟล์ Chrome หาโดยอ้างชื่อที่แสดงในหน้าเลือกโปรไฟล์ ถึง Chrome จะสลับเลขโฟลเดอร์ก็ยังใช้ได้
 
 ปุ่ม **จัดโฟลเดอร์ใหม่** ใช้จัดไฟล์เก่าที่กองอยู่ให้เข้าที่
 
