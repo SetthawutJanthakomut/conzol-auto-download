@@ -6,7 +6,7 @@
   // If a panel already exists the later copy stops here - otherwise ids collide and buttons stop responding
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '6.0';   // kept in sync with @version at build time
+  const VERSION = '6.1';   // kept in sync with @version at build time
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.user.js';   // filled in per language at build time
 
   // ---------------- Settings ----------------
@@ -19,6 +19,7 @@
     retry: 1,
     maxNameLen: 180,
     supersededDir: '_Superseded',
+    commentDir: 'Comment File',   // the stamped copies the owner returns, kept with the document itself
     unsortedDir: '_Unsorted',
     // Folders never touched - not scanned, not re-sorted (cancelled MDR documents live here)
     ignoreDirs: ['_Deleted', '_Archive', '_Cancelled']
@@ -114,17 +115,20 @@
   // Accept any file whose name starts with a document number, except part-downloads
   const SKIP_EXT = /\.(tmp|crdownload|part|partial|download|!ut)$/i;
 
-  // Stamped copies (Comment File) get a suffix so they never overwrite the original
+  // Stamped copies (Comment File) go in a sub-folder of the document's own folder
+  // Names ending in (Stamped) are v6.0's - still recognised, so old files are not downloaded twice
   const STAMP_RE = /\s\(Stamped(?:\s\d+)?\)$/i;
   const isStampName = (name) => {
     const dot = String(name).lastIndexOf('.');
     return STAMP_RE.test(dot > 0 ? String(name).slice(0, dot) : String(name));
   };
+  const isStampPath = (path) => (path || []).some((p) => norm(p) === norm(CFG.commentDir));
 
-  function safeName(r, ext, stampNo) {
+  // dupNo: one reply can carry several files - the 2nd onward get (2) (3) so names do not clash
+  function safeName(r, ext, dupNo) {
     let base = r.doc + (r.rev ? '-' + r.rev : '') + (r.rcode ? '-' + r.rcode : '') + (r.title ? '_' + r.title : '');
     base = base.replace(/[\\/:*?"<>|\r\n\t]/g, '-').replace(/\s+/g, ' ').replace(/[. ]+$/g, '').trim();
-    const sfx = stampNo ? (' (Stamped' + (stampNo > 1 ? ' ' + stampNo : '') + ')') : '';
+    const sfx = dupNo > 1 ? ' (' + dupNo + ')' : '';
     const room = CFG.maxNameLen - sfx.length;
     if (base.length > room) base = base.slice(0, room).trim();
     return base + sfx + '.' + String(ext || 'pdf').toLowerCase();
@@ -216,6 +220,7 @@
   ];
 
   const revRank = (series, num) => (String(series).toUpperCase() === 'T' ? 1000 : 0) + parseInt(num, 10);
+  const rankOfRev = (rev) => { const m = /^([TR])(\d+)$/i.exec(String(rev || '')); return m ? revRank(m[1], m[2]) : -1; };
 
   // ============ IndexedDB - remember the chosen folder ============
   function idb() {
@@ -268,7 +273,7 @@
         rev: (m[2] + m[3]).toUpperCase(),
         rank: revRank(m[2], m[3]),
         ext: (entry.name.split('.').pop() || 'pdf').toLowerCase(),
-        kind: isStampName(entry.name) ? 'stamp' : 'file',
+        kind: (isStampPath(path) || isStampName(entry.name)) ? 'stamp' : 'file',
         parent: dir,
         path: path,
         handle: entry
@@ -725,7 +730,7 @@
           <label><input type="checkbox" id="edl-getpdf" checked> PDF (PDF+ column)</label>
           <label><input type="checkbox" id="edl-getfile"> Native attachment (FILE+ column · .zip)</label>
           <label><input type="checkbox" id="edl-getstamp"> Stamped copy (Comment File returned by the owner)</label>
-          <div class="hint">The stamped copy is a separate file from the plain PDF; its name ends with (Stamped). It has to open each document's history table, so it runs a little slower.</div>
+          <div class="hint">Kept in a <b>Comment File</b> sub-folder of the document's own folder, taking the latest revision the owner has replied to. It has to open every document's history table, so it runs a little slower.</div>
         </fieldset>
       </div>
 
@@ -1112,15 +1117,24 @@
       if (wantPdf) kinds.push({ ext: 'pdf', url: 'getfile.asp?type=p&fileid=' + r.fileid + '&docid=0' });
       if (wantFile && r.fileHref) kinds.push({ ext: r.fileExt || 'zip', url: r.fileHref });
       if (wantStamp) {
-        const all = (hRow && hRow.cmt) || [];
+        // Always the latest - if the owner has not replied to the newest Rev, fall back to the newest one that is stamped
+        const hist = revCache.get(r.fileid) || (hRow ? [hRow] : []);
+        const withCmt = hist.filter((x) => x.cmt && x.cmt.length)
+          .sort((a, b) => rankOfRev(b.rev) - rankOfRev(a.rev));
+        const src = (hRow && hRow.cmt && hRow.cmt.length) ? hRow : (withCmt[0] || null);
+        const all = src ? src.cmt : [];
         // One transmittal can carry other documents' files - keep those naming this document, else take them all
         const mine = all.filter((x) => norm(x.name).includes(norm(doc)));
         const pick = mine.length ? mine : all;
-        if (!pick.length && hRow) log(`      ↳ ${doc}-${r.rev} has no stamped copy in the Comment File column`, 'sk');
+        if (!pick.length && hist.length) log(`      ↳ ${doc} has nothing in the Comment File column yet`, 'sk');
+        if (src && norm(src.rev) !== norm(r.rev)) log(`      ↳ ${doc}: the latest stamped copy is ${src.rev} (Rev ${r.rev} has no reply yet)`, 'wn');
+        const sRow = src ? { ...r, rev: src.rev, rcode: src.rcode || '' } : r;
+        const sRank = src ? rankOfRev(src.rev) : rank;
         pick.forEach((x, n) => {
           const dot = String(x.name || '').lastIndexOf('.');
           const ex = dot > 0 ? x.name.slice(dot + 1).toLowerCase() : 'pdf';
-          kinds.push({ ext: /^[a-z0-9]{1,5}$/.test(ex) ? ex : 'pdf', url: x.href, stamp: n + 1 });
+          kinds.push({ ext: /^[a-z0-9]{1,5}$/.test(ex) ? ex : 'pdf', url: x.href,
+                       stamp: true, dup: n + 1, row: sRow, rank: sRank, sub: [CFG.commentDir] });
         });
       }
 
@@ -1133,13 +1147,16 @@
 
       for (const k of kinds) {
         if (stopFlag) break;
-        const name = safeName(r, k.ext, k.stamp);
+        const kr = k.row || r;                                   // a stamped copy may belong to another Rev
+        const kRank = k.rank != null ? k.rank : rank;
+        const kParts = k.sub ? parts.concat(k.sub) : parts;      // stamped copies go in the Comment File sub-folder
+        const name = safeName(kr, k.ext, k.dup);
         const kind = k.stamp ? 'stamp' : 'file';
         const sameKind = (h) => (h.ext || 'pdf') === k.ext && (h.kind || 'file') === kind;
 
-        if (skip && have.some((h) => h.rev === r.rev.toUpperCase() && sameKind(h))) {
+        if (skip && have.some((h) => h.rev === String(kr.rev).toUpperCase() && sameKind(h))) {
           skipped++;
-          lastReport.push({ ...r, result: 'Skipped (already present)', file: name, folder: '' });
+          lastReport.push({ ...kr, result: 'Skipped (already present)', file: name, folder: '' });
           log(`[${i}/${items.length}] skipped ${name}`, 'sk');
           continue;
         }
@@ -1148,14 +1165,14 @@
           ok++;
           const willSup = [];
           if (doSup) for (const h of have) {
-            if (sameKind(h) && h.rank < rank && h.name !== name) willSup.push(h);
+            if (sameKind(h) && h.rank < kRank && h.name !== name) willSup.push(h);
           }
           sup += willSup.length;
-          lastReport.push({ ...r, result: 'Will download', file: name, folder: parts.join('\\') });
-          log(`[${i}/${items.length}] + ${name}  →  ${parts.join('\\')}`, 'ok');
+          lastReport.push({ ...kr, result: 'Will download', file: name, folder: kParts.join('\\') });
+          log(`[${i}/${items.length}] + ${name}  →  ${kParts.join('\\')}`, 'ok');
           for (const h of willSup) {
-            lastReport.push({ ...r, rev: h.rev, result: 'Will move to _Superseded', file: h.name,
-                              folder: (h.path || parts).concat(CFG.supersededDir).join('\\') });
+            lastReport.push({ ...kr, rev: h.rev, result: 'Will move to _Superseded', file: h.name,
+                              folder: (h.path || kParts).concat(CFG.supersededDir).join('\\') });
             log(`      ↳ ${h.name} → _Superseded`, 'wn');
           }
           continue;
@@ -1167,12 +1184,12 @@
           try {
             const blob = await fetchDoc(k.url);
             if (useFS) {
-              const dir = await ensureDir(parts);
+              const dir = await ensureDir(kParts);
               await writeInto(dir, name, blob);
               if (doSup) {
                 for (const h of have.slice()) {
-                  if (sameKind(h) && h.rank < rank && h.name !== name) {
-                    if (await moveToSuperseded(h, parts)) {
+                  if (sameKind(h) && h.rank < kRank && h.name !== name) {
+                    if (await moveToSuperseded(h, h.path || kParts)) {
                       sup++; log(`      ↳ ${h.name} → _Superseded`, 'wn');
                       const ix = have.indexOf(h); if (ix >= 0) have.splice(ix, 1);
                     }
@@ -1180,19 +1197,19 @@
                 }
               }
               try {
-                have.push({ name, rev: r.rev.toUpperCase(), rank, ext: k.ext, kind,
-                            parent: dir, path: parts, handle: await dir.getFileHandle(name) });
+                have.push({ name, rev: String(kr.rev).toUpperCase(), rank: kRank, ext: k.ext, kind,
+                            parent: dir, path: kParts, handle: await dir.getFileHandle(name) });
               } catch (e) {}
             } else {
               browserDownload(name, blob);
             }
             ok++; done = true;
-            lastReport.push({ ...r, result: 'Downloaded', file: name, folder: parts.join('\\') });
+            lastReport.push({ ...kr, result: 'Downloaded', file: name, folder: kParts.join('\\') });
             log(`[${i}/${items.length}] ✓ ${name} (${(blob.size / 1048576).toFixed(2)} MB)`, 'ok');
           } catch (e) {
             if (a === CFG.retry) {
               fail++;
-              lastReport.push({ ...r, result: 'Error: ' + e.message, file: name, folder: '' });
+              lastReport.push({ ...kr, result: 'Error: ' + e.message, file: name, folder: '' });
               log(`[${i}/${items.length}] ✗ ${name} → ${e.message}`, 'er');
             } else await sleep(1200);
           }

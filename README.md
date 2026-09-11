@@ -59,8 +59,9 @@ No auto-update on this route.
 2. **Folder → Choose folder…** → pick where documents go (asked once, remembered)
 3. Tick what you want: **PDF** (PDF+ column), **Native attachment** (FILE+ column, `.zip`) and/or
    **Stamped copy** — the file the owner returned through the Comment File column, the one carrying the
-   DOCUMENT REVIEW box (AP / AC / NA / RN / RC). It saves alongside the plain PDF with ` (Stamped)` on
-   the end of the name, so the two never overwrite each other.
+   DOCUMENT REVIEW box (AP / AC / NA / RN / RC). It goes into a `Comment File\` sub-folder of the same
+   document folder, keeping its normal name, and it is always the latest revision the owner has replied
+   to: if the newest Rev has no reply yet, the newest stamped revision is taken instead and the log says so.
 4. Then either
    - run a SEARCH and press **Download this page**, or
    - pick your MDR `.xlsx` and press **Search ConZoL + download all**
@@ -147,10 +148,11 @@ its display name, so it keeps working when Chrome renumbers its profile folders.
 
 | | |
 |---|---|
-| **Naming** | `<DocNo>-<Rev>_<Title>.<ext>` — title comes from ConZoL. Options can add the owner's reply code: `<DocNo>-<Rev>-<R.Code>_<Title>`. Stamped copies end with ` (Stamped)` |
+| **Naming** | `<DocNo>-<Rev>_<Title>.<ext>` — title comes from ConZoL. Options can add the owner's reply code: `<DocNo>-<Rev>-<R.Code>_<Title>` |
 | **Folders** | Read from ConZoL's own group headers (`MA-CAL:MARINE Calculation`), never hard-coded — new disciplines and document types work with no changes |
 | **Areas** | `1400`, `0500`, `PCC`, `CAZ` … become sub-folders; add friendly labels in `AREA_LABELS` |
 | **Revisions** | Latest revision stays in place, older ones move to a `_Superseded\` folder inside the same document folder |
+| **Stamped copies** | Kept in `Comment File\` beside the document, with their own `_Superseded\` — never mixed up with the issued file |
 | **Repeat runs** | Files already on disk are skipped — only new documents and changed revisions download |
 | **Cancelled docs** | Rows struck through or marked *Delete* in the MDR are ignored |
 | **Reporting** | **Save CSV report** lists what downloaded, what was skipped, what ConZoL does not have |
@@ -256,7 +258,8 @@ chrome://extensions/?id=dhdgffkkebhmkfjojejmpbldmpobfkfo
 2. แท็บ **โฟลเดอร์** → กด **เลือกโฟลเดอร์…** ชี้ที่เก็บเอกสาร (ถามครั้งเดียว จำไว้ให้)
 3. ติ๊กชนิดไฟล์: **PDF** (คอลัมน์ PDF+), **ไฟล์แนบต้นฉบับ** (คอลัมน์ FILE+ · `.zip`)
    และ/หรือ **ไฟล์ที่มีตารางประทับ** — ไฟล์ที่ผู้ว่าจ้างส่งกลับมาในช่อง Comment File
-   มีตาราง DOCUMENT REVIEW (AP / AC / NA / RN / RC) เก็บคู่กับ PDF ต้นฉบับ ชื่อลงท้ายว่า ` (Stamped)` จึงไม่ทับกัน
+   มีตาราง DOCUMENT REVIEW (AP / AC / NA / RN / RC) เก็บในโฟลเดอร์ย่อย `Comment File\` ของเอกสารนั้นเอง
+   ใช้ชื่อไฟล์ปกติ และเอา Rev ล่าสุดที่ผู้ว่าจ้างตอบกลับแล้วเสมอ — ถ้า Rev ใหม่สุดยังไม่ตอบกลับ จะถอยไปเอา Rev ที่มีตราประทับใหม่สุดแทน พร้อมบอกไว้ในบันทึกการทำงาน
 4. เลือกวิธีโหลด
    - กด SEARCH ตามปกติ แล้วกด **โหลดจากหน้านี้** หรือ
    - เลือกไฟล์ MDR `.xlsx` แล้วกด **ค้น ConZoL + โหลดทั้งหมด**
