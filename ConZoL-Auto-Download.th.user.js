@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GULF ConZoL – Auto Download + Rename + Sort (MDR)
 // @namespace    gmtp.marine.jay
-// @version      6.1
+// @version      6.2
 // @description  ดาวน์โหลด PDF และไฟล์แนบ (FILE+) จาก ConZoL ลงโฟลเดอร์ที่เลือกไว้โดยตรง (ไม่ผ่าน Download ของ Chrome) ตั้งชื่อ <DocNo>-<Rev>_<Title>.pdf แยกโฟลเดอร์ตามหมวด ย้าย Rev เก่าเข้า _Superseded และอ่านรายการจากไฟล์ MDR ให้เอง
 // @author       JAY
 // @match        https://edms.gulf.co.th/dms/drawing.asp*
@@ -22,7 +22,7 @@
   // ถ้ามีกล่องอยู่แล้ว ให้ชุดที่มาทีหลังหยุดทำงาน ไม่งั้น id จะซ้ำและปุ่มจะกดไม่ติด
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '6.1';   // ซิงก์อัตโนมัติจาก @version ตอน build
+  const VERSION = '6.2';   // ซิงก์อัตโนมัติจาก @version ตอน build
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.th.user.js';   // build.py ใส่ให้ตามภาษา
 
   // ---------------- ตั้งค่าได้ตรงนี้ ----------------
@@ -729,7 +729,7 @@
           <label><input type="checkbox" id="edl-getpdf" checked> PDF (คอลัมน์ PDF+)</label>
           <label><input type="checkbox" id="edl-getfile"> ไฟล์แนบต้นฉบับ (คอลัมน์ FILE+ · .zip)</label>
           <label><input type="checkbox" id="edl-getstamp"> ไฟล์ที่มีตารางประทับ (Comment File ที่ผู้ว่าจ้างส่งกลับ)</label>
-          <div class="hint">เก็บแยกไว้ในโฟลเดอร์ย่อย <b>Comment File</b> ของเอกสารนั้นเอง และเอา Rev ล่าสุดที่ผู้ว่าจ้างตอบกลับมาแล้ว · ต้องเปิดตารางประวัติทุกเอกสาร จึงช้ากว่าปกติเล็กน้อย</div>
+          <div class="hint">เก็บแยกไว้ในโฟลเดอร์ย่อย <b>Comment File</b> ของเอกสารนั้นเอง เอาเฉพาะ <b>PDF</b> ของ Rev ล่าสุดที่ผู้ว่าจ้างตอบกลับมาแล้ว · ต้องเปิดตารางประวัติทุกเอกสาร จึงช้ากว่าปกติเล็กน้อย</div>
         </fieldset>
       </div>
 
@@ -941,18 +941,20 @@
 
       // แยกตามนามสกุลก่อน — PDF กับไฟล์แนบเป็นไฟล์คนละชนิดของเอกสารเดียวกัน
       // ไม่ใช่ Rev เก่าของกันและกัน ถ้าไม่แยกจะมีตัวหนึ่งโดนย้ายเข้า _Superseded
+      // ไฟล์ตราประทับก็แยกอีกชั้น เพราะอยู่คนละโฟลเดอร์และนับ Rev กันเอง
       const byExt = new Map();
       for (const it of list) {
-        const e = it.ext || 'pdf';
+        const e = (it.ext || 'pdf') + '|' + (it.kind || 'file');
         if (!byExt.has(e)) byExt.set(e, []);
         byExt.get(e).push(it);
       }
 
       for (const group of byExt.values()) {
+      const home = group[0].kind === 'stamp' ? parts.concat(CFG.commentDir) : parts;
       const sorted = [...group].sort((a, b) => b.rank - a.rank);
       for (let i = 0; i < sorted.length; i++) {
         const it = sorted[i];
-        const dest = (i === 0 || !doSup) ? parts : parts.concat(CFG.supersededDir);
+        const dest = (i === 0 || !doSup) ? home : home.concat(CFG.supersededDir);
         try {
           const r = await moveTo(it, dest);
           if (r === 'moved') {
@@ -1117,24 +1119,22 @@
       if (wantFile && r.fileHref) kinds.push({ ext: r.fileExt || 'zip', url: r.fileHref });
       if (wantStamp) {
         // เอาของ Rev ล่าสุดเสมอ — ถ้า Rev ล่าสุดผู้ว่าจ้างยังไม่ตอบกลับ ถอยไปใช้ Rev ใหม่สุดที่มีไฟล์ตราประทับ
+        // เอาเฉพาะ PDF — ใบคอมเมนต์ที่แนบมาเป็น .xls/.doc ไม่ต้อง
+        const pdfsOf = (x) => (x && x.cmt ? x.cmt : []).filter((c) => /\.pdf$/i.test(c.name || ''));
         const hist = revCache.get(r.fileid) || (hRow ? [hRow] : []);
-        const withCmt = hist.filter((x) => x.cmt && x.cmt.length)
+        const withCmt = hist.filter((x) => pdfsOf(x).length)
           .sort((a, b) => rankOfRev(b.rev) - rankOfRev(a.rev));
-        const src = (hRow && hRow.cmt && hRow.cmt.length) ? hRow : (withCmt[0] || null);
-        const all = src ? src.cmt : [];
+        const src = pdfsOf(hRow).length ? hRow : (withCmt[0] || null);
+        const all = pdfsOf(src);
         // ใบเดียวกันอาจแนบไฟล์ของเอกสารอื่นมาด้วย — เอาเฉพาะที่ชื่อมีเลขเอกสารนี้ ถ้าไม่มีเลยค่อยเอาทั้งหมด
         const mine = all.filter((x) => norm(x.name).includes(norm(doc)));
         const pick = mine.length ? mine : all;
-        if (!pick.length && hist.length) log(`      ↳ ${doc} ยังไม่มีไฟล์ตราประทับในช่อง Comment File`, 'sk');
+        if (!pick.length && hist.length) log(`      ↳ ${doc} ยังไม่มีไฟล์ตราประทับ (PDF) ในช่อง Comment File`, 'sk');
         if (src && norm(src.rev) !== norm(r.rev)) log(`      ↳ ${doc}: ตราประทับล่าสุดเป็นของ ${src.rev} (Rev ${r.rev} ยังไม่ตอบกลับ)`, 'wn');
         const sRow = src ? { ...r, rev: src.rev, rcode: src.rcode || '' } : r;
         const sRank = src ? rankOfRev(src.rev) : rank;
-        pick.forEach((x, n) => {
-          const dot = String(x.name || '').lastIndexOf('.');
-          const ex = dot > 0 ? x.name.slice(dot + 1).toLowerCase() : 'pdf';
-          kinds.push({ ext: /^[a-z0-9]{1,5}$/.test(ex) ? ex : 'pdf', url: x.href,
-                       stamp: true, dup: n + 1, row: sRow, rank: sRank, sub: [CFG.commentDir] });
-        });
+        pick.forEach((x, n) => kinds.push({ ext: 'pdf', url: x.href,
+          stamp: true, dup: n + 1, row: sRow, rank: sRank, sub: [CFG.commentDir] }));
       }
 
       if (!kinds.length) {
@@ -1518,7 +1518,7 @@
           doc, rev: it.rev, rank: it.rank,
           title: titleFromFile(it.name),
           file: it.name,
-          ext: String(it.ext || '').toUpperCase() + (it.kind === 'stamp' ? ' (Stamped)' : ''),
+          ext: String(it.ext || '').toUpperCase() + (it.kind === 'stamp' ? ' (Comment File)' : ''),
           folder: (it.path || []).join('\\') || '.',
           status: it.rank === top.get(keyOf(it)) ? 'Current' : 'Superseded',
           size, mtime

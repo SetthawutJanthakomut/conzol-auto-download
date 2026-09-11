@@ -1164,16 +1164,8 @@
   "// dupNo: one reply can carry several files - the 2nd onward get (2) (3) so names do not clash"
  ],
  [
-  "<div class=\"hint\">เก็บแยกไว้ในโฟลเดอร์ย่อย <b>Comment File</b> ของเอกสารนั้นเอง และเอา Rev ล่าสุดที่ผู้ว่าจ้างตอบกลับมาแล้ว · ต้องเปิดตารางประวัติทุกเอกสาร จึงช้ากว่าปกติเล็กน้อย</div>",
-  "<div class=\"hint\">Kept in a <b>Comment File</b> sub-folder of the document's own folder, taking the latest revision the owner has replied to. It has to open every document's history table, so it runs a little slower.</div>"
- ],
- [
   "// เอาของ Rev ล่าสุดเสมอ — ถ้า Rev ล่าสุดผู้ว่าจ้างยังไม่ตอบกลับ ถอยไปใช้ Rev ใหม่สุดที่มีไฟล์ตราประทับ",
   "// Always the latest - if the owner has not replied to the newest Rev, fall back to the newest one that is stamped"
- ],
- [
-  "if (!pick.length && hist.length) log(`      ↳ ${doc} ยังไม่มีไฟล์ตราประทับในช่อง Comment File`, 'sk');",
-  "if (!pick.length && hist.length) log(`      ↳ ${doc} has nothing in the Comment File column yet`, 'sk');"
  ],
  [
   "if (src && norm(src.rev) !== norm(r.rev)) log(`      ↳ ${doc}: ตราประทับล่าสุดเป็นของ ${src.rev} (Rev ${r.rev} ยังไม่ตอบกลับ)`, 'wn');",
@@ -1186,5 +1178,21 @@
  [
   "const kParts = k.sub ? parts.concat(k.sub) : parts;      // ตราประทับลงโฟลเดอร์ย่อย Comment File",
   "const kParts = k.sub ? parts.concat(k.sub) : parts;      // stamped copies go in the Comment File sub-folder"
+ ],
+ [
+  "<div class=\"hint\">เก็บแยกไว้ในโฟลเดอร์ย่อย <b>Comment File</b> ของเอกสารนั้นเอง เอาเฉพาะ <b>PDF</b> ของ Rev ล่าสุดที่ผู้ว่าจ้างตอบกลับมาแล้ว · ต้องเปิดตารางประวัติทุกเอกสาร จึงช้ากว่าปกติเล็กน้อย</div>",
+  "<div class=\"hint\">Kept in a <b>Comment File</b> sub-folder of the document itself. <b>PDF only</b>, from the newest revision the owner has answered. It has to open each document's history table, so it runs a little slower.</div>"
+ ],
+ [
+  "// ไฟล์ตราประทับก็แยกอีกชั้น เพราะอยู่คนละโฟลเดอร์และนับ Rev กันเอง",
+  "// Stamped copies split off again - they live in their own folder and count revisions among themselves"
+ ],
+ [
+  "// เอาเฉพาะ PDF — ใบคอมเมนต์ที่แนบมาเป็น .xls/.doc ไม่ต้อง",
+  "// PDF only - comment sheets attached as .xls/.doc are not wanted"
+ ],
+ [
+  "if (!pick.length && hist.length) log(`      ↳ ${doc} ยังไม่มีไฟล์ตราประทับ (PDF) ในช่อง Comment File`, 'sk');",
+  "if (!pick.length && hist.length) log(`      ↳ ${doc} has no stamped PDF in the Comment File column yet`, 'sk');"
  ]
 ]

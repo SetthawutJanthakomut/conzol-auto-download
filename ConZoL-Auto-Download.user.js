@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GULF ConZoL - Auto Download + Rename + Sort
 // @namespace    gmtp.conzol
-// @version      6.1
+// @version      6.2
 // @description  Download PDFs and native attachments from GULF ConZoL EDMS automatically - names each file and sorts it into the folder ConZoL assigns.
 // @match        https://edms.gulf.co.th/dms/drawing.asp*
 // @match        http://edms.gulf.co.th/dms/drawing.asp*
@@ -22,7 +22,7 @@
   // If a panel already exists the later copy stops here - otherwise ids collide and buttons stop responding
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '6.1';   // kept in sync with @version at build time
+  const VERSION = '6.2';   // kept in sync with @version at build time
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.user.js';   // filled in per language at build time
 
   // ---------------- Settings ----------------
@@ -746,7 +746,7 @@
           <label><input type="checkbox" id="edl-getpdf" checked> PDF (PDF+ column)</label>
           <label><input type="checkbox" id="edl-getfile"> Native attachment (FILE+ column · .zip)</label>
           <label><input type="checkbox" id="edl-getstamp"> Stamped copy (Comment File returned by the owner)</label>
-          <div class="hint">Kept in a <b>Comment File</b> sub-folder of the document's own folder, taking the latest revision the owner has replied to. It has to open every document's history table, so it runs a little slower.</div>
+          <div class="hint">Kept in a <b>Comment File</b> sub-folder of the document itself. <b>PDF only</b>, from the newest revision the owner has answered. It has to open each document's history table, so it runs a little slower.</div>
         </fieldset>
       </div>
 
@@ -958,18 +958,20 @@
 
       // Group by extension first - the PDF and the attachment are two file types of
       // the same document, not older revisions of each other. Without this split one
+      // Stamped copies split off again - they live in their own folder and count revisions among themselves
       const byExt = new Map();
       for (const it of list) {
-        const e = it.ext || 'pdf';
+        const e = (it.ext || 'pdf') + '|' + (it.kind || 'file');
         if (!byExt.has(e)) byExt.set(e, []);
         byExt.get(e).push(it);
       }
 
       for (const group of byExt.values()) {
+      const home = group[0].kind === 'stamp' ? parts.concat(CFG.commentDir) : parts;
       const sorted = [...group].sort((a, b) => b.rank - a.rank);
       for (let i = 0; i < sorted.length; i++) {
         const it = sorted[i];
-        const dest = (i === 0 || !doSup) ? parts : parts.concat(CFG.supersededDir);
+        const dest = (i === 0 || !doSup) ? home : home.concat(CFG.supersededDir);
         try {
           const r = await moveTo(it, dest);
           if (r === 'moved') {
@@ -1134,24 +1136,22 @@
       if (wantFile && r.fileHref) kinds.push({ ext: r.fileExt || 'zip', url: r.fileHref });
       if (wantStamp) {
         // Always the latest - if the owner has not replied to the newest Rev, fall back to the newest one that is stamped
+        // PDF only - comment sheets attached as .xls/.doc are not wanted
+        const pdfsOf = (x) => (x && x.cmt ? x.cmt : []).filter((c) => /\.pdf$/i.test(c.name || ''));
         const hist = revCache.get(r.fileid) || (hRow ? [hRow] : []);
-        const withCmt = hist.filter((x) => x.cmt && x.cmt.length)
+        const withCmt = hist.filter((x) => pdfsOf(x).length)
           .sort((a, b) => rankOfRev(b.rev) - rankOfRev(a.rev));
-        const src = (hRow && hRow.cmt && hRow.cmt.length) ? hRow : (withCmt[0] || null);
-        const all = src ? src.cmt : [];
+        const src = pdfsOf(hRow).length ? hRow : (withCmt[0] || null);
+        const all = pdfsOf(src);
         // One transmittal can carry other documents' files - keep those naming this document, else take them all
         const mine = all.filter((x) => norm(x.name).includes(norm(doc)));
         const pick = mine.length ? mine : all;
-        if (!pick.length && hist.length) log(`      ↳ ${doc} has nothing in the Comment File column yet`, 'sk');
+        if (!pick.length && hist.length) log(`      ↳ ${doc} has no stamped PDF in the Comment File column yet`, 'sk');
         if (src && norm(src.rev) !== norm(r.rev)) log(`      ↳ ${doc}: the latest stamped copy is ${src.rev} (Rev ${r.rev} has no reply yet)`, 'wn');
         const sRow = src ? { ...r, rev: src.rev, rcode: src.rcode || '' } : r;
         const sRank = src ? rankOfRev(src.rev) : rank;
-        pick.forEach((x, n) => {
-          const dot = String(x.name || '').lastIndexOf('.');
-          const ex = dot > 0 ? x.name.slice(dot + 1).toLowerCase() : 'pdf';
-          kinds.push({ ext: /^[a-z0-9]{1,5}$/.test(ex) ? ex : 'pdf', url: x.href,
-                       stamp: true, dup: n + 1, row: sRow, rank: sRank, sub: [CFG.commentDir] });
-        });
+        pick.forEach((x, n) => kinds.push({ ext: 'pdf', url: x.href,
+          stamp: true, dup: n + 1, row: sRow, rank: sRank, sub: [CFG.commentDir] }));
       }
 
       if (!kinds.length) {
@@ -1535,7 +1535,7 @@
           doc, rev: it.rev, rank: it.rank,
           title: titleFromFile(it.name),
           file: it.name,
-          ext: String(it.ext || '').toUpperCase() + (it.kind === 'stamp' ? ' (Stamped)' : ''),
+          ext: String(it.ext || '').toUpperCase() + (it.kind === 'stamp' ? ' (Comment File)' : ''),
           folder: (it.path || []).join('\\') || '.',
           status: it.rank === top.get(keyOf(it)) ? 'Current' : 'Superseded',
           size, mtime

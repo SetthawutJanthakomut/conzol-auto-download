@@ -62,6 +62,7 @@ No auto-update on this route.
    DOCUMENT REVIEW box (AP / AC / NA / RN / RC). It goes into a `Comment File\` sub-folder of the same
    document folder, keeping its normal name, and it is always the latest revision the owner has replied
    to: if the newest Rev has no reply yet, the newest stamped revision is taken instead and the log says so.
+   Only PDFs are taken - a comment sheet attached as .xls or .doc is left behind.
 4. Then either
    - run a SEARCH and press **Download this page**, or
    - pick your MDR `.xlsx` and press **Search ConZoL + download all**
@@ -152,7 +153,7 @@ its display name, so it keeps working when Chrome renumbers its profile folders.
 | **Folders** | Read from ConZoL's own group headers (`MA-CAL:MARINE Calculation`), never hard-coded — new disciplines and document types work with no changes |
 | **Areas** | `1400`, `0500`, `PCC`, `CAZ` … become sub-folders; add friendly labels in `AREA_LABELS` |
 | **Revisions** | Latest revision stays in place, older ones move to a `_Superseded\` folder inside the same document folder |
-| **Stamped copies** | Kept in `Comment File\` beside the document, with their own `_Superseded\` — never mixed up with the issued file |
+| **Stamped copies** | PDF only, kept in `Comment File\` beside the document, with their own `_Superseded\` — never mixed up with the issued file |
 | **Repeat runs** | Files already on disk are skipped — only new documents and changed revisions download |
 | **Cancelled docs** | Rows struck through or marked *Delete* in the MDR are ignored |
 | **Reporting** | **Save CSV report** lists what downloaded, what was skipped, what ConZoL does not have |
@@ -260,6 +261,7 @@ chrome://extensions/?id=dhdgffkkebhmkfjojejmpbldmpobfkfo
    และ/หรือ **ไฟล์ที่มีตารางประทับ** — ไฟล์ที่ผู้ว่าจ้างส่งกลับมาในช่อง Comment File
    มีตาราง DOCUMENT REVIEW (AP / AC / NA / RN / RC) เก็บในโฟลเดอร์ย่อย `Comment File\` ของเอกสารนั้นเอง
    ใช้ชื่อไฟล์ปกติ และเอา Rev ล่าสุดที่ผู้ว่าจ้างตอบกลับแล้วเสมอ — ถ้า Rev ใหม่สุดยังไม่ตอบกลับ จะถอยไปเอา Rev ที่มีตราประทับใหม่สุดแทน พร้อมบอกไว้ในบันทึกการทำงาน
+   เอาเฉพาะไฟล์ PDF เท่านั้น ใบคอมเมนต์ที่แนบมาเป็น .xls หรือ .doc จะไม่โหลด
 4. เลือกวิธีโหลด
    - กด SEARCH ตามปกติ แล้วกด **โหลดจากหน้านี้** หรือ
    - เลือกไฟล์ MDR `.xlsx` แล้วกด **ค้น ConZoL + โหลดทั้งหมด**
