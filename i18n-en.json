@@ -336,10 +336,6 @@
   "// ============ Download runner ============"
  ],
  [
-  "'· ยังไม่ได้เลือกว่าจะโหลดอะไร — ติ๊ก PDF หรือ ไฟล์แนบ อย่างน้อยหนึ่งอย่าง'",
-  "'· Nothing selected - tick PDF and/or Native attachment first'"
- ],
- [
   "'■ หยุดโดยผู้ใช้'",
   "'■ Stopped by user'"
  ],
@@ -720,10 +716,6 @@
   "// Each row's FILE cell is that revision's own file, so every revision can be fetched, not just the latest"
  ],
  [
-  "// แถวย่อยของไฟล์แนบมี 2 ช่อง ข้ามไป",
-  "// attachment sub-rows have 2 cells - skip them"
- ],
- [
   "// แถวหัวตาราง",
   "// the header row"
  ],
@@ -1088,16 +1080,8 @@
   " Add R.Code after the revision in the file name (…-T0-AC_…)</label>"
  ],
  [
-  "// R.Code อยู่ในตารางประวัติ ไม่ได้อยู่ในหน้าผลค้นหา ต้องไปดึงมาต่างหาก",
-  "// R.Code lives in the revision history, not in the search results, so it is fetched"
- ],
- [
   "// fileid -> ประวัติ Rev เผื่อเอกสารเดิมโผล่ซ้ำ",
   "// fileid -> revision history, in case a document comes round twice"
- ],
- [
-  "log(`      ↳ อ่าน R.Code ของ ${doc} ไม่ได้: ${e.message}`, 'wn');",
-  "log(`      ↳ could not read the R.Code for ${doc}: ${e.message}`, 'wn');"
  ],
  [
   "// จำค่าช่องติ๊กไว้ เปิดหน้าใหม่หรือวันรุ่งขึ้นก็ยังเป็นค่าที่ตั้งไว้",
@@ -1126,5 +1110,53 @@
  [
   "askBar('▶ กดที่นี่ เพื่ออนุญาตโฟลเดอร์แล้วเริ่มงานประจำวัน', async () => {",
   "askBar('▶ Press here to allow the folder and start today\\u2019s run', async () => {"
+ ],
+ [
+  "// ไฟล์ที่มีตราประทับ (Comment File) เติมท้ายชื่อไว้ จะได้ไม่ทับไฟล์ต้นฉบับ",
+  "// Stamped copies (Comment File) get a suffix so they never overwrite the original"
+ ],
+ [
+  "// ลิงก์ในตารางประวัติบางช่องใช้ onclick แทน href — ดึง URL ออกมาให้ได้ทั้งสองแบบ",
+  "// Some cells in the history table carry the link in onclick rather than href - read both"
+ ],
+ [
+  "let last = null;                              // แถว Rev ล่าสุดที่เก็บไว้ เผื่อไฟล์แนบอยู่แถวย่อย",
+  "let last = null;                              // last Rev row kept, in case attachments sit in a sub-row"
+ ],
+ [
+  "// แถวย่อยของไฟล์แนบมี 2 ช่อง — เก็บเฉพาะลิงก์ที่ชื่อตรงกับที่เขียนไว้ในช่อง Comment File",
+  "// Attachment sub-rows have 2 cells - keep only links whose name appears in the Comment File cell"
+ ],
+ [
+  "// ช่อง Comment File = ไฟล์ที่ผู้ว่าจ้างส่งกลับมา มีตารางตราประทับ (CONSOL_*.pdf)",
+  "// Comment File column = the copy the owner returned, carrying the review stamp box (CONSOL_*.pdf)"
+ ],
+ [
+  "<label><input type=\"checkbox\" id=\"edl-getstamp\"> ไฟล์ที่มีตารางประทับ (Comment File ที่ผู้ว่าจ้างส่งกลับ)</label>",
+  "<label><input type=\"checkbox\" id=\"edl-getstamp\"> Stamped copy (Comment File returned by the owner)</label>"
+ ],
+ [
+  "<div class=\"hint\">ไฟล์ตราประทับเป็นไฟล์คนละตัวกับ PDF ต้นฉบับ ชื่อจะลงท้ายว่า (Stamped) · ต้องเปิดตารางประวัติทุกเอกสาร จึงช้ากว่าปกติเล็กน้อย</div>",
+  "<div class=\"hint\">The stamped copy is a separate file from the plain PDF; its name ends with (Stamped). It has to open each document's history table, so it runs a little slower.</div>"
+ ],
+ [
+  "log('· ยังไม่ได้เลือกว่าจะโหลดอะไร — ติ๊ก PDF, ไฟล์แนบ หรือ ไฟล์ที่มีตราประทับ อย่างน้อยหนึ่งอย่าง', 'er');",
+  "log('. Nothing selected to download - tick PDF, the native attachment, or the stamped copy', 'er');"
+ ],
+ [
+  "// R.Code กับไฟล์ตราประทับอยู่ในตารางประวัติ ไม่ได้อยู่ในหน้าผลค้นหา ต้องไปดึงมาต่างหาก",
+  "// R.Code and the stamped copy live in the history table, not in the search results - fetch them separately"
+ ],
+ [
+  "} catch (e) { log(`      ↳ อ่านตารางประวัติของ ${doc} ไม่ได้: ${e.message}`, 'wn'); }",
+  "} catch (e) { log(`      ↳ could not read the history table for ${doc}: ${e.message}`, 'wn'); }"
+ ],
+ [
+  "// ใบเดียวกันอาจแนบไฟล์ของเอกสารอื่นมาด้วย — เอาเฉพาะที่ชื่อมีเลขเอกสารนี้ ถ้าไม่มีเลยค่อยเอาทั้งหมด",
+  "// One transmittal can carry other documents' files - keep those naming this document, else take them all"
+ ],
+ [
+  "if (!pick.length && hRow) log(`      ↳ ${doc}-${r.rev} ไม่มีไฟล์ตราประทับในช่อง Comment File`, 'sk');",
+  "if (!pick.length && hRow) log(`      ↳ ${doc}-${r.rev} has no stamped copy in the Comment File column`, 'sk');"
  ]
 ]

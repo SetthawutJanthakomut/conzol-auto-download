@@ -6,7 +6,7 @@
   // If a panel already exists the later copy stops here - otherwise ids collide and buttons stop responding
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '5.9';   // kept in sync with @version at build time
+  const VERSION = '6.0';   // kept in sync with @version at build time
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.user.js';   // filled in per language at build time
 
   // ---------------- Settings ----------------
@@ -114,11 +114,20 @@
   // Accept any file whose name starts with a document number, except part-downloads
   const SKIP_EXT = /\.(tmp|crdownload|part|partial|download|!ut)$/i;
 
-  function safeName(r, ext) {
+  // Stamped copies (Comment File) get a suffix so they never overwrite the original
+  const STAMP_RE = /\s\(Stamped(?:\s\d+)?\)$/i;
+  const isStampName = (name) => {
+    const dot = String(name).lastIndexOf('.');
+    return STAMP_RE.test(dot > 0 ? String(name).slice(0, dot) : String(name));
+  };
+
+  function safeName(r, ext, stampNo) {
     let base = r.doc + (r.rev ? '-' + r.rev : '') + (r.rcode ? '-' + r.rcode : '') + (r.title ? '_' + r.title : '');
     base = base.replace(/[\\/:*?"<>|\r\n\t]/g, '-').replace(/\s+/g, ' ').replace(/[. ]+$/g, '').trim();
-    if (base.length > CFG.maxNameLen) base = base.slice(0, CFG.maxNameLen).trim();
-    return base + '.' + String(ext || 'pdf').toLowerCase();
+    const sfx = stampNo ? (' (Stamped' + (stampNo > 1 ? ' ' + stampNo : '') + ')') : '';
+    const room = CFG.maxNameLen - sfx.length;
+    if (base.length > room) base = base.slice(0, room).trim();
+    return base + sfx + '.' + String(ext || 'pdf').toLowerCase();
   }
 
   const sanitizeFolder = (s) => String(s).replace(/[\\/:*?"<>|\r\n\t]/g, '-')
@@ -259,6 +268,7 @@
         rev: (m[2] + m[3]).toUpperCase(),
         rank: revRank(m[2], m[3]),
         ext: (entry.name.split('.').pop() || 'pdf').toLowerCase(),
+        kind: isStampName(entry.name) ? 'stamp' : 'file',
         parent: dir,
         path: path,
         handle: entry
@@ -374,6 +384,15 @@
     return { rows: parseRows(d), pages: [...d.querySelectorAll('select[name=page] option')].map((o) => o.value) };
   }
 
+  // Some cells in the history table carry the link in onclick rather than href - read both
+  function linkUrl(a) {
+    const h = a.getAttribute('href') || '';
+    if (h && !/^\s*(#|javascript:)/i.test(h)) return h;
+    const m = /['"]([^'"]*(?:getfile|getattach|download)[^'"]*\.asp[^'"]*)['"]/i
+      .exec((a.getAttribute('onclick') || '') + ' ' + h);
+    return m ? m[1] : '';
+  }
+
   // ConZoL serves the full revision history from getdoc.asp - the same table the page expands
   //   Rev · Status · Iss.Date · Tr.Date · NO.(Transmittal) · Code · R.Code · R.Date · R.Ref · Description · Comment File · FILE
   // Each row's FILE cell is that revision's own file, so every revision can be fetched, not just the latest
@@ -382,18 +401,43 @@
     if (!res.ok) throw new Error('getdoc.asp HTTP ' + res.status);
     const d = new DOMParser().parseFromString('<table>' + (await res.text()) + '</table>', 'text/html');
     const out = [];
+    let last = null;                              // last Rev row kept, in case attachments sit in a sub-row
     for (const tr of d.querySelectorAll('tr')) {
       const c = tr.cells;
-      if (!c || c.length < 12) continue;          // attachment sub-rows have 2 cells - skip them
+      if (!c) continue;
+
+      // Attachment sub-rows have 2 cells - keep only links whose name appears in the Comment File cell
+      if (c.length < 12) {
+        if (last && last._cmtText) {
+          for (const a of tr.querySelectorAll('a')) {
+            const nm = String(a.innerText || '').replace(/\s+/g, ' ').trim();
+            const u = linkUrl(a);
+            if (!nm || !u || !last._cmtText.includes(nm)) continue;
+            if (!last.cmt.some((x) => x.href === u)) last.cmt.push({ name: nm, href: u });
+          }
+        }
+        continue;
+      }
+
       const t = (i) => String(c[i].innerText || '').replace(/\s+/g, ' ').trim();
       const rev = t(0);
-      if (!/^[A-Z]+\d+$/i.test(rev)) continue;    // the header row
+      if (!/^[A-Z]+\d+$/i.test(rev)) { last = null; continue; }   // the header row
       const fa = c[11].querySelector('a[href*="getfile.asp"]');
-      out.push({
+      // Comment File column = the copy the owner returned, carrying the review stamp box (CONSOL_*.pdf)
+      const cmt = [];
+      for (const a of c[10].querySelectorAll('a')) {
+        const u = linkUrl(a);
+        if (!u) continue;
+        const nm = String(a.innerText || '').replace(/\s+/g, ' ').trim();
+        if (!cmt.some((x) => x.href === u)) cmt.push({ name: nm, href: u });
+      }
+      last = {
         rev: rev.toUpperCase(), status: t(1), iss: t(2), trd: t(3), no: t(4),
         code: t(5), rcode: t(6), rdate: t(7), rref: t(8), desc: t(9),
-        href: fa ? fa.getAttribute('href') : ''
-      });
+        href: fa ? fa.getAttribute('href') : '',
+        cmt, _cmtText: t(10)
+      };
+      out.push(last);
     }
     return out;
   }
@@ -680,6 +724,8 @@
         <fieldset><legend>What to download</legend>
           <label><input type="checkbox" id="edl-getpdf" checked> PDF (PDF+ column)</label>
           <label><input type="checkbox" id="edl-getfile"> Native attachment (FILE+ column · .zip)</label>
+          <label><input type="checkbox" id="edl-getstamp"> Stamped copy (Comment File returned by the owner)</label>
+          <div class="hint">The stamped copy is a separate file from the plain PDF; its name ends with (Stamped). It has to open each document's history table, so it runs a little slower.</div>
         </fieldset>
       </div>
 
@@ -1031,12 +1077,13 @@
     const doSup = el('edl-sup').checked;
     const wantPdf = el('edl-getpdf').checked;
     const wantFile = el('edl-getfile').checked;
+    const wantStamp = el('edl-getstamp').checked;
     const wantRCode = el('edl-rcode').checked;
     const revCache = new Map();   // fileid -> revision history, in case a document comes round twice
     const useFS = !!rootDir;
 
-    if (!wantPdf && !wantFile) {
-      log('· Nothing selected - tick PDF and/or Native attachment first', 'er');
+    if (!wantPdf && !wantFile && !wantStamp) {
+      log('. Nothing selected to download - tick PDF, the native attachment, or the stamped copy', 'er');
       return { ok, skipped, fail, sup };
     }
 
@@ -1050,19 +1097,32 @@
       const have = existing.get(doc);
       const parts = targetPath(doc, r.groupCode, r.groupName);
 
-      // R.Code lives in the revision history, not in the search results, so it is fetched
-      if (wantRCode && !r.rcode && r.fileid) {
+      // R.Code and the stamped copy live in the history table, not in the search results - fetch them separately
+      let hRow = null;
+      if (((wantRCode && !r.rcode) || wantStamp) && r.fileid) {
         try {
           let h = revCache.get(r.fileid);
           if (!h) { h = await fetchRevisions(r.fileid); revCache.set(r.fileid, h); await sleep(CFG.histDelayMs); }
-          const hit = h.find((x) => norm(x.rev) === norm(r.rev));
-          if (hit && hit.rcode) r = { ...r, rcode: hit.rcode };
-        } catch (e) { log(`      ↳ could not read the R.Code for ${doc}: ${e.message}`, 'wn'); }
+          hRow = h.find((x) => norm(x.rev) === norm(r.rev)) || null;
+          if (wantRCode && !r.rcode && hRow && hRow.rcode) r = { ...r, rcode: hRow.rcode };
+        } catch (e) { log(`      ↳ could not read the history table for ${doc}: ${e.message}`, 'wn'); }
       }
 
       const kinds = [];
       if (wantPdf) kinds.push({ ext: 'pdf', url: 'getfile.asp?type=p&fileid=' + r.fileid + '&docid=0' });
       if (wantFile && r.fileHref) kinds.push({ ext: r.fileExt || 'zip', url: r.fileHref });
+      if (wantStamp) {
+        const all = (hRow && hRow.cmt) || [];
+        // One transmittal can carry other documents' files - keep those naming this document, else take them all
+        const mine = all.filter((x) => norm(x.name).includes(norm(doc)));
+        const pick = mine.length ? mine : all;
+        if (!pick.length && hRow) log(`      ↳ ${doc}-${r.rev} has no stamped copy in the Comment File column`, 'sk');
+        pick.forEach((x, n) => {
+          const dot = String(x.name || '').lastIndexOf('.');
+          const ex = dot > 0 ? x.name.slice(dot + 1).toLowerCase() : 'pdf';
+          kinds.push({ ext: /^[a-z0-9]{1,5}$/.test(ex) ? ex : 'pdf', url: x.href, stamp: n + 1 });
+        });
+      }
 
       if (!kinds.length) {
         skipped++;
@@ -1073,9 +1133,11 @@
 
       for (const k of kinds) {
         if (stopFlag) break;
-        const name = safeName(r, k.ext);
+        const name = safeName(r, k.ext, k.stamp);
+        const kind = k.stamp ? 'stamp' : 'file';
+        const sameKind = (h) => (h.ext || 'pdf') === k.ext && (h.kind || 'file') === kind;
 
-        if (skip && have.some((h) => h.rev === r.rev.toUpperCase() && (h.ext || 'pdf') === k.ext)) {
+        if (skip && have.some((h) => h.rev === r.rev.toUpperCase() && sameKind(h))) {
           skipped++;
           lastReport.push({ ...r, result: 'Skipped (already present)', file: name, folder: '' });
           log(`[${i}/${items.length}] skipped ${name}`, 'sk');
@@ -1086,7 +1148,7 @@
           ok++;
           const willSup = [];
           if (doSup) for (const h of have) {
-            if ((h.ext || 'pdf') === k.ext && h.rank < rank && h.name !== name) willSup.push(h);
+            if (sameKind(h) && h.rank < rank && h.name !== name) willSup.push(h);
           }
           sup += willSup.length;
           lastReport.push({ ...r, result: 'Will download', file: name, folder: parts.join('\\') });
@@ -1109,7 +1171,7 @@
               await writeInto(dir, name, blob);
               if (doSup) {
                 for (const h of have.slice()) {
-                  if ((h.ext || 'pdf') === k.ext && h.rank < rank && h.name !== name) {
+                  if (sameKind(h) && h.rank < rank && h.name !== name) {
                     if (await moveToSuperseded(h, parts)) {
                       sup++; log(`      ↳ ${h.name} → _Superseded`, 'wn');
                       const ix = have.indexOf(h); if (ix >= 0) have.splice(ix, 1);
@@ -1118,7 +1180,7 @@
                 }
               }
               try {
-                have.push({ name, rev: r.rev.toUpperCase(), rank, ext: k.ext,
+                have.push({ name, rev: r.rev.toUpperCase(), rank, ext: k.ext, kind,
                             parent: dir, path: parts, handle: await dir.getFileHandle(name) });
               } catch (e) {}
             } else {
@@ -1259,7 +1321,7 @@
     d.textContent = msg || (last ? 'Last automatic run: ' + last : 'Has not run on its own yet');
   }
   // Remember the checkboxes, so a new page or the next morning keeps the same settings
-  ['edl-rcode', 'edl-skip', 'edl-sup', 'edl-area', 'edl-inactive', 'edl-getpdf', 'edl-getfile',
+  ['edl-rcode', 'edl-skip', 'edl-sup', 'edl-area', 'edl-inactive', 'edl-getpdf', 'edl-getfile', 'edl-getstamp',
    'edl-sh-mdr', 'edl-sh-rev', 'edl-sh-folder', 'edl-sh-conzol', 'edl-sh-cmp'].forEach((id) => {
     const c = el(id);
     if (!c) return;
@@ -1410,7 +1472,7 @@
     let t = name.slice(m[0].length);
     const dot = t.lastIndexOf('.');
     if (dot > 0) t = t.slice(0, dot);
-    return t.trim();
+    return t.replace(STAMP_RE, '').trim();
   }
 
   async function collectFolderRows() {
@@ -1420,8 +1482,9 @@
     for (const doc of [...existing.keys()].sort()) {
       const list = existing.get(doc) || [];
       const top = new Map();   // extension -> highest rank = the current revision
+      const keyOf = (it) => (it.ext || 'pdf') + '|' + (it.kind || 'file');
       for (const it of list) {
-        const e = it.ext || 'pdf';
+        const e = keyOf(it);
         if (!top.has(e) || it.rank > top.get(e)) top.set(e, it.rank);
       }
       const sorted = [...list].sort((a, b) => (b.rank - a.rank) ||
@@ -1439,9 +1502,9 @@
           doc, rev: it.rev, rank: it.rank,
           title: titleFromFile(it.name),
           file: it.name,
-          ext: String(it.ext || '').toUpperCase(),
+          ext: String(it.ext || '').toUpperCase() + (it.kind === 'stamp' ? ' (Stamped)' : ''),
           folder: (it.path || []).join('\\') || '.',
-          status: it.rank === top.get(it.ext || 'pdf') ? 'Current' : 'Superseded',
+          status: it.rank === top.get(keyOf(it)) ? 'Current' : 'Superseded',
           size, mtime
         });
       }
@@ -1642,12 +1705,13 @@
           h.forEach((x, j) => rv.push([rv.length + 1, r ? r.doc : k, r ? r.title : '', j + 1]
             .concat(CZ_COLS.map((f) => f[1](x) || ''))
             .concat([x.rref || '', x.desc || '',
+                     (x.cmt || []).map((c) => c.name).join(' ; '),
                      r ? targetPath(r.doc, r.groupCode, r.groupName).join('\\') : ''])));
         }
         XLSX.utils.book_append_sheet(wb, mkSheet(
           [['S/N', 'Document No.', 'Title', 'No.'].concat(CZ_COLS.map((f) => f[0]))
-            .concat(['R.Ref', 'Description', 'Target Folder'])].concat(rv),
-          [6, 26, 46, 5].concat(CZ_COLS.map((f) => f[2])).concat([12, 30, 34])), 'ConZoL Revisions');
+            .concat(['R.Ref', 'Description', 'Comment File', 'Target Folder'])].concat(rv),
+          [6, 26, 46, 5].concat(CZ_COLS.map((f) => f[2])).concat([12, 30, 34, 34])), 'ConZoL Revisions');
         log(`  ConZoL Revisions sheet: ${rv.length} revisions`, 'ok');
       }
 

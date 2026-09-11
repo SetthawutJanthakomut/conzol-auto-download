@@ -57,7 +57,10 @@ No auto-update on this route.
    tabs: **Download**, **Excel list**, **Folder**, **Options**. The destination folder shows in a strip
    under the tabs, and the stop button, status line and log stay visible whichever tab you are on.
 2. **Folder → Choose folder…** → pick where documents go (asked once, remembered)
-3. Tick what you want: **PDF** (PDF+ column) and/or **Native attachment** (FILE+ column, `.zip`)
+3. Tick what you want: **PDF** (PDF+ column), **Native attachment** (FILE+ column, `.zip`) and/or
+   **Stamped copy** — the file the owner returned through the Comment File column, the one carrying the
+   DOCUMENT REVIEW box (AP / AC / NA / RN / RC). It saves alongside the plain PDF with ` (Stamped)` on
+   the end of the name, so the two never overwrite each other.
 4. Then either
    - run a SEARCH and press **Download this page**, or
    - pick your MDR `.xlsx` and press **Search ConZoL + download all**
@@ -88,7 +91,7 @@ heading naming the round (`For Construction / For Final - 2nd Issue`).
 ConZoL keeps its own revision history for every document — the table the web page expands under a
 document — and **Fetch every revision from ConZoL** pulls it from `getdoc.asp` into the **ConZoL
 Revisions** sheet, one line per revision: *Rev · Status · Iss.Date · Tr.Date · TR No. · Code · R.Code ·
-R.Date*. It stays separate from the MDR sheet, so each sheet has a single source: the MDR sheet is your
+R.Date · Comment File*. It stays separate from the MDR sheet, so each sheet has a single source: the MDR sheet is your
 register, the ConZoL Revisions sheet is what the system actually holds. With an MDR loaded only its
 documents are fetched, so a 141-document register takes well under a minute.
 
@@ -144,7 +147,7 @@ its display name, so it keeps working when Chrome renumbers its profile folders.
 
 | | |
 |---|---|
-| **Naming** | `<DocNo>-<Rev>_<Title>.<ext>` — title comes from ConZoL. Options can add the owner's reply code: `<DocNo>-<Rev>-<R.Code>_<Title>` |
+| **Naming** | `<DocNo>-<Rev>_<Title>.<ext>` — title comes from ConZoL. Options can add the owner's reply code: `<DocNo>-<Rev>-<R.Code>_<Title>`. Stamped copies end with ` (Stamped)` |
 | **Folders** | Read from ConZoL's own group headers (`MA-CAL:MARINE Calculation`), never hard-coded — new disciplines and document types work with no changes |
 | **Areas** | `1400`, `0500`, `PCC`, `CAZ` … become sub-folders; add friendly labels in `AREA_LABELS` |
 | **Revisions** | Latest revision stays in place, older ones move to a `_Superseded\` folder inside the same document folder |
@@ -251,7 +254,9 @@ chrome://extensions/?id=dhdgffkkebhmkfjojejmpbldmpobfkfo
    **โหลด** · **รายการ Excel** · **โฟลเดอร์** · **ตั้งค่า** โฟลเดอร์ปลายทางขึ้นเป็นแถบใต้แท็บ
    ส่วนปุ่มหยุด สถานะ และบันทึกการทำงาน เห็นตลอดไม่ว่าอยู่แท็บไหน
 2. แท็บ **โฟลเดอร์** → กด **เลือกโฟลเดอร์…** ชี้ที่เก็บเอกสาร (ถามครั้งเดียว จำไว้ให้)
-3. ติ๊กชนิดไฟล์: **PDF** (คอลัมน์ PDF+) และ/หรือ **ไฟล์แนบต้นฉบับ** (คอลัมน์ FILE+ · `.zip`)
+3. ติ๊กชนิดไฟล์: **PDF** (คอลัมน์ PDF+), **ไฟล์แนบต้นฉบับ** (คอลัมน์ FILE+ · `.zip`)
+   และ/หรือ **ไฟล์ที่มีตารางประทับ** — ไฟล์ที่ผู้ว่าจ้างส่งกลับมาในช่อง Comment File
+   มีตาราง DOCUMENT REVIEW (AP / AC / NA / RN / RC) เก็บคู่กับ PDF ต้นฉบับ ชื่อลงท้ายว่า ` (Stamped)` จึงไม่ทับกัน
 4. เลือกวิธีโหลด
    - กด SEARCH ตามปกติ แล้วกด **โหลดจากหน้านี้** หรือ
    - เลือกไฟล์ MDR `.xlsx` แล้วกด **ค้น ConZoL + โหลดทั้งหมด**
@@ -268,7 +273,7 @@ chrome://extensions/?id=dhdgffkkebhmkfjojejmpbldmpobfkfo
 | **ConZoL** | เอกสารทุกตัวที่มีใน ConZoL ตาม discipline ที่เลือก — Rev, ชื่อเรื่อง, กลุ่ม, พื้นที่, มีไฟล์แนบไหม และโฟลเดอร์ที่ควรอยู่ |
 | **Compare** | เทียบสองฝั่ง — *Up to date*, *ConZoL ใหม่กว่า — ต้องโหลด*, *ยังไม่มีในโฟลเดอร์ — ต้องโหลด*, *ไม่พบใน ConZoL* |
 | **MDR** | MDR ของคุณเอง อัปเดตสถานะให้ — ขึ้นเฉพาะตอนโหลดไฟล์ MDR ในข้อ 2 แล้ว |
-| **ConZoL Revisions** | หนึ่งบรรทัดต่อหนึ่ง Rev ดึงจาก ConZoL ตรง ๆ — Rev, Status, วันที่ออก/ส่ง, เลข TR, Code, R.Code, R.Date |
+| **ConZoL Revisions** | หนึ่งบรรทัดต่อหนึ่ง Rev ดึงจาก ConZoL ตรง ๆ — Rev, Status, วันที่ออก/ส่ง, เลข TR, Code, R.Code, R.Date, Comment File |
 
 ชีต MDR เก็บคอลัมน์เดิมของ MDR ไว้ (S/N, Document No., Title, Activity ID, Budget, Class, Rev. ล่าสุด,
 Issue Status ล่าสุด, Owner's Reply ล่าสุด, Progress) ต่อด้วย Rev ปัจจุบันใน ConZoL, **MDR vs ConZoL**
@@ -280,7 +285,7 @@ Reply Due · Reply Received · Reply TR No.* ใต้หัวตาราง�
 
 ConZoL เก็บประวัติทุก Rev ของแต่ละเอกสารไว้อยู่แล้ว (ตารางที่กดกางออกมาในหน้าเว็บ) ติ๊ก
 **ดึงประวัติทุก Rev จาก ConZoL** จะไปดึงจาก `getdoc.asp` มาลงชีต **ConZoL Revisions** บรรทัดละ 1 Rev
-*Rev · Status · Iss.Date · Tr.Date · TR No. · Code · R.Code · R.Date* แยกจากชีต MDR คนละชีต
+*Rev · Status · Iss.Date · Tr.Date · TR No. · Code · R.Code · R.Date · Comment File* แยกจากชีต MDR คนละชีต
 แต่ละชีตจึงมีที่มาชุดเดียว — ชีต MDR คือทะเบียนของคุณ ชีต ConZoL Revisions คือของจริงในระบบ
 ถ้าโหลด MDR ไว้จะดึงเฉพาะเอกสารใน MDR — 141 รายการใช้เวลาไม่ถึงนาที
 

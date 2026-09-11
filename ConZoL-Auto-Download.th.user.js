@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GULF ConZoL – Auto Download + Rename + Sort (MDR)
 // @namespace    gmtp.marine.jay
-// @version      5.9
+// @version      6.0
 // @description  ดาวน์โหลด PDF และไฟล์แนบ (FILE+) จาก ConZoL ลงโฟลเดอร์ที่เลือกไว้โดยตรง (ไม่ผ่าน Download ของ Chrome) ตั้งชื่อ <DocNo>-<Rev>_<Title>.pdf แยกโฟลเดอร์ตามหมวด ย้าย Rev เก่าเข้า _Superseded และอ่านรายการจากไฟล์ MDR ให้เอง
 // @author       JAY
 // @match        https://edms.gulf.co.th/dms/drawing.asp*
@@ -22,7 +22,7 @@
   // ถ้ามีกล่องอยู่แล้ว ให้ชุดที่มาทีหลังหยุดทำงาน ไม่งั้น id จะซ้ำและปุ่มจะกดไม่ติด
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '5.9';   // ซิงก์อัตโนมัติจาก @version ตอน build
+  const VERSION = '6.0';   // ซิงก์อัตโนมัติจาก @version ตอน build
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.th.user.js';   // build.py ใส่ให้ตามภาษา
 
   // ---------------- ตั้งค่าได้ตรงนี้ ----------------
@@ -113,11 +113,20 @@
   // รับทุกไฟล์ที่ชื่อขึ้นต้นด้วยเลขเอกสาร ยกเว้นไฟล์ที่ยังโหลดไม่จบ
   const SKIP_EXT = /\.(tmp|crdownload|part|partial|download|!ut)$/i;
 
-  function safeName(r, ext) {
+  // ไฟล์ที่มีตราประทับ (Comment File) เติมท้ายชื่อไว้ จะได้ไม่ทับไฟล์ต้นฉบับ
+  const STAMP_RE = /\s\(Stamped(?:\s\d+)?\)$/i;
+  const isStampName = (name) => {
+    const dot = String(name).lastIndexOf('.');
+    return STAMP_RE.test(dot > 0 ? String(name).slice(0, dot) : String(name));
+  };
+
+  function safeName(r, ext, stampNo) {
     let base = r.doc + (r.rev ? '-' + r.rev : '') + (r.rcode ? '-' + r.rcode : '') + (r.title ? '_' + r.title : '');
     base = base.replace(/[\\/:*?"<>|\r\n\t]/g, '-').replace(/\s+/g, ' ').replace(/[. ]+$/g, '').trim();
-    if (base.length > CFG.maxNameLen) base = base.slice(0, CFG.maxNameLen).trim();
-    return base + '.' + String(ext || 'pdf').toLowerCase();
+    const sfx = stampNo ? (' (Stamped' + (stampNo > 1 ? ' ' + stampNo : '') + ')') : '';
+    const room = CFG.maxNameLen - sfx.length;
+    if (base.length > room) base = base.slice(0, room).trim();
+    return base + sfx + '.' + String(ext || 'pdf').toLowerCase();
   }
 
   const sanitizeFolder = (s) => String(s).replace(/[\\/:*?"<>|\r\n\t]/g, '-')
@@ -258,6 +267,7 @@
         rev: (m[2] + m[3]).toUpperCase(),
         rank: revRank(m[2], m[3]),
         ext: (entry.name.split('.').pop() || 'pdf').toLowerCase(),
+        kind: isStampName(entry.name) ? 'stamp' : 'file',
         parent: dir,
         path: path,
         handle: entry
@@ -373,6 +383,15 @@
     return { rows: parseRows(d), pages: [...d.querySelectorAll('select[name=page] option')].map((o) => o.value) };
   }
 
+  // ลิงก์ในตารางประวัติบางช่องใช้ onclick แทน href — ดึง URL ออกมาให้ได้ทั้งสองแบบ
+  function linkUrl(a) {
+    const h = a.getAttribute('href') || '';
+    if (h && !/^\s*(#|javascript:)/i.test(h)) return h;
+    const m = /['"]([^'"]*(?:getfile|getattach|download)[^'"]*\.asp[^'"]*)['"]/i
+      .exec((a.getAttribute('onclick') || '') + ' ' + h);
+    return m ? m[1] : '';
+  }
+
   // ConZoL เก็บประวัติทุก Rev ไว้ที่ getdoc.asp — เป็นตารางเดียวกับที่กดกางออกมาในหน้าเว็บ
   //   Rev · Status · Iss.Date · Tr.Date · NO.(Transmittal) · Code · R.Code · R.Date · R.Ref · Description · Comment File · FILE
   // ช่อง FILE ของแต่ละแถวคือไฟล์ของ Rev นั้นเอง จึงโหลดย้อนหลังได้ทุก Rev ไม่ใช่แค่ตัวล่าสุด
@@ -381,18 +400,43 @@
     if (!res.ok) throw new Error('getdoc.asp HTTP ' + res.status);
     const d = new DOMParser().parseFromString('<table>' + (await res.text()) + '</table>', 'text/html');
     const out = [];
+    let last = null;                              // แถว Rev ล่าสุดที่เก็บไว้ เผื่อไฟล์แนบอยู่แถวย่อย
     for (const tr of d.querySelectorAll('tr')) {
       const c = tr.cells;
-      if (!c || c.length < 12) continue;          // แถวย่อยของไฟล์แนบมี 2 ช่อง ข้ามไป
+      if (!c) continue;
+
+      // แถวย่อยของไฟล์แนบมี 2 ช่อง — เก็บเฉพาะลิงก์ที่ชื่อตรงกับที่เขียนไว้ในช่อง Comment File
+      if (c.length < 12) {
+        if (last && last._cmtText) {
+          for (const a of tr.querySelectorAll('a')) {
+            const nm = String(a.innerText || '').replace(/\s+/g, ' ').trim();
+            const u = linkUrl(a);
+            if (!nm || !u || !last._cmtText.includes(nm)) continue;
+            if (!last.cmt.some((x) => x.href === u)) last.cmt.push({ name: nm, href: u });
+          }
+        }
+        continue;
+      }
+
       const t = (i) => String(c[i].innerText || '').replace(/\s+/g, ' ').trim();
       const rev = t(0);
-      if (!/^[A-Z]+\d+$/i.test(rev)) continue;    // แถวหัวตาราง
+      if (!/^[A-Z]+\d+$/i.test(rev)) { last = null; continue; }   // แถวหัวตาราง
       const fa = c[11].querySelector('a[href*="getfile.asp"]');
-      out.push({
+      // ช่อง Comment File = ไฟล์ที่ผู้ว่าจ้างส่งกลับมา มีตารางตราประทับ (CONSOL_*.pdf)
+      const cmt = [];
+      for (const a of c[10].querySelectorAll('a')) {
+        const u = linkUrl(a);
+        if (!u) continue;
+        const nm = String(a.innerText || '').replace(/\s+/g, ' ').trim();
+        if (!cmt.some((x) => x.href === u)) cmt.push({ name: nm, href: u });
+      }
+      last = {
         rev: rev.toUpperCase(), status: t(1), iss: t(2), trd: t(3), no: t(4),
         code: t(5), rcode: t(6), rdate: t(7), rref: t(8), desc: t(9),
-        href: fa ? fa.getAttribute('href') : ''
-      });
+        href: fa ? fa.getAttribute('href') : '',
+        cmt, _cmtText: t(10)
+      };
+      out.push(last);
     }
     return out;
   }
@@ -679,6 +723,8 @@
         <fieldset><legend>ชนิดไฟล์ที่จะโหลด</legend>
           <label><input type="checkbox" id="edl-getpdf" checked> PDF (คอลัมน์ PDF+)</label>
           <label><input type="checkbox" id="edl-getfile"> ไฟล์แนบต้นฉบับ (คอลัมน์ FILE+ · .zip)</label>
+          <label><input type="checkbox" id="edl-getstamp"> ไฟล์ที่มีตารางประทับ (Comment File ที่ผู้ว่าจ้างส่งกลับ)</label>
+          <div class="hint">ไฟล์ตราประทับเป็นไฟล์คนละตัวกับ PDF ต้นฉบับ ชื่อจะลงท้ายว่า (Stamped) · ต้องเปิดตารางประวัติทุกเอกสาร จึงช้ากว่าปกติเล็กน้อย</div>
         </fieldset>
       </div>
 
@@ -1030,12 +1076,13 @@
     const doSup = el('edl-sup').checked;
     const wantPdf = el('edl-getpdf').checked;
     const wantFile = el('edl-getfile').checked;
+    const wantStamp = el('edl-getstamp').checked;
     const wantRCode = el('edl-rcode').checked;
     const revCache = new Map();   // fileid -> ประวัติ Rev เผื่อเอกสารเดิมโผล่ซ้ำ
     const useFS = !!rootDir;
 
-    if (!wantPdf && !wantFile) {
-      log('· ยังไม่ได้เลือกว่าจะโหลดอะไร — ติ๊ก PDF หรือ ไฟล์แนบ อย่างน้อยหนึ่งอย่าง', 'er');
+    if (!wantPdf && !wantFile && !wantStamp) {
+      log('· ยังไม่ได้เลือกว่าจะโหลดอะไร — ติ๊ก PDF, ไฟล์แนบ หรือ ไฟล์ที่มีตราประทับ อย่างน้อยหนึ่งอย่าง', 'er');
       return { ok, skipped, fail, sup };
     }
 
@@ -1049,19 +1096,32 @@
       const have = existing.get(doc);
       const parts = targetPath(doc, r.groupCode, r.groupName);
 
-      // R.Code อยู่ในตารางประวัติ ไม่ได้อยู่ในหน้าผลค้นหา ต้องไปดึงมาต่างหาก
-      if (wantRCode && !r.rcode && r.fileid) {
+      // R.Code กับไฟล์ตราประทับอยู่ในตารางประวัติ ไม่ได้อยู่ในหน้าผลค้นหา ต้องไปดึงมาต่างหาก
+      let hRow = null;
+      if (((wantRCode && !r.rcode) || wantStamp) && r.fileid) {
         try {
           let h = revCache.get(r.fileid);
           if (!h) { h = await fetchRevisions(r.fileid); revCache.set(r.fileid, h); await sleep(CFG.histDelayMs); }
-          const hit = h.find((x) => norm(x.rev) === norm(r.rev));
-          if (hit && hit.rcode) r = { ...r, rcode: hit.rcode };
-        } catch (e) { log(`      ↳ อ่าน R.Code ของ ${doc} ไม่ได้: ${e.message}`, 'wn'); }
+          hRow = h.find((x) => norm(x.rev) === norm(r.rev)) || null;
+          if (wantRCode && !r.rcode && hRow && hRow.rcode) r = { ...r, rcode: hRow.rcode };
+        } catch (e) { log(`      ↳ อ่านตารางประวัติของ ${doc} ไม่ได้: ${e.message}`, 'wn'); }
       }
 
       const kinds = [];
       if (wantPdf) kinds.push({ ext: 'pdf', url: 'getfile.asp?type=p&fileid=' + r.fileid + '&docid=0' });
       if (wantFile && r.fileHref) kinds.push({ ext: r.fileExt || 'zip', url: r.fileHref });
+      if (wantStamp) {
+        const all = (hRow && hRow.cmt) || [];
+        // ใบเดียวกันอาจแนบไฟล์ของเอกสารอื่นมาด้วย — เอาเฉพาะที่ชื่อมีเลขเอกสารนี้ ถ้าไม่มีเลยค่อยเอาทั้งหมด
+        const mine = all.filter((x) => norm(x.name).includes(norm(doc)));
+        const pick = mine.length ? mine : all;
+        if (!pick.length && hRow) log(`      ↳ ${doc}-${r.rev} ไม่มีไฟล์ตราประทับในช่อง Comment File`, 'sk');
+        pick.forEach((x, n) => {
+          const dot = String(x.name || '').lastIndexOf('.');
+          const ex = dot > 0 ? x.name.slice(dot + 1).toLowerCase() : 'pdf';
+          kinds.push({ ext: /^[a-z0-9]{1,5}$/.test(ex) ? ex : 'pdf', url: x.href, stamp: n + 1 });
+        });
+      }
 
       if (!kinds.length) {
         skipped++;
@@ -1072,9 +1132,11 @@
 
       for (const k of kinds) {
         if (stopFlag) break;
-        const name = safeName(r, k.ext);
+        const name = safeName(r, k.ext, k.stamp);
+        const kind = k.stamp ? 'stamp' : 'file';
+        const sameKind = (h) => (h.ext || 'pdf') === k.ext && (h.kind || 'file') === kind;
 
-        if (skip && have.some((h) => h.rev === r.rev.toUpperCase() && (h.ext || 'pdf') === k.ext)) {
+        if (skip && have.some((h) => h.rev === r.rev.toUpperCase() && sameKind(h))) {
           skipped++;
           lastReport.push({ ...r, result: 'ข้าม (มีอยู่แล้ว)', file: name, folder: '' });
           log(`[${i}/${items.length}] ข้าม ${name}`, 'sk');
@@ -1085,7 +1147,7 @@
           ok++;
           const willSup = [];
           if (doSup) for (const h of have) {
-            if ((h.ext || 'pdf') === k.ext && h.rank < rank && h.name !== name) willSup.push(h);
+            if (sameKind(h) && h.rank < rank && h.name !== name) willSup.push(h);
           }
           sup += willSup.length;
           lastReport.push({ ...r, result: 'จะโหลด', file: name, folder: parts.join('\\') });
@@ -1108,7 +1170,7 @@
               await writeInto(dir, name, blob);
               if (doSup) {
                 for (const h of have.slice()) {
-                  if ((h.ext || 'pdf') === k.ext && h.rank < rank && h.name !== name) {
+                  if (sameKind(h) && h.rank < rank && h.name !== name) {
                     if (await moveToSuperseded(h, parts)) {
                       sup++; log(`      ↳ ${h.name} → _Superseded`, 'wn');
                       const ix = have.indexOf(h); if (ix >= 0) have.splice(ix, 1);
@@ -1117,7 +1179,7 @@
                 }
               }
               try {
-                have.push({ name, rev: r.rev.toUpperCase(), rank, ext: k.ext,
+                have.push({ name, rev: r.rev.toUpperCase(), rank, ext: k.ext, kind,
                             parent: dir, path: parts, handle: await dir.getFileHandle(name) });
               } catch (e) {}
             } else {
@@ -1258,7 +1320,7 @@
     d.textContent = msg || (last ? 'รันอัตโนมัติล่าสุด: ' + last : 'ยังไม่เคยรันอัตโนมัติ');
   }
   // จำค่าช่องติ๊กไว้ เปิดหน้าใหม่หรือวันรุ่งขึ้นก็ยังเป็นค่าที่ตั้งไว้
-  ['edl-rcode', 'edl-skip', 'edl-sup', 'edl-area', 'edl-inactive', 'edl-getpdf', 'edl-getfile',
+  ['edl-rcode', 'edl-skip', 'edl-sup', 'edl-area', 'edl-inactive', 'edl-getpdf', 'edl-getfile', 'edl-getstamp',
    'edl-sh-mdr', 'edl-sh-rev', 'edl-sh-folder', 'edl-sh-conzol', 'edl-sh-cmp'].forEach((id) => {
     const c = el(id);
     if (!c) return;
@@ -1409,7 +1471,7 @@
     let t = name.slice(m[0].length);
     const dot = t.lastIndexOf('.');
     if (dot > 0) t = t.slice(0, dot);
-    return t.trim();
+    return t.replace(STAMP_RE, '').trim();
   }
 
   async function collectFolderRows() {
@@ -1419,8 +1481,9 @@
     for (const doc of [...existing.keys()].sort()) {
       const list = existing.get(doc) || [];
       const top = new Map();   // นามสกุล -> rank สูงสุด = ตัวล่าสุด
+      const keyOf = (it) => (it.ext || 'pdf') + '|' + (it.kind || 'file');
       for (const it of list) {
-        const e = it.ext || 'pdf';
+        const e = keyOf(it);
         if (!top.has(e) || it.rank > top.get(e)) top.set(e, it.rank);
       }
       const sorted = [...list].sort((a, b) => (b.rank - a.rank) ||
@@ -1438,9 +1501,9 @@
           doc, rev: it.rev, rank: it.rank,
           title: titleFromFile(it.name),
           file: it.name,
-          ext: String(it.ext || '').toUpperCase(),
+          ext: String(it.ext || '').toUpperCase() + (it.kind === 'stamp' ? ' (Stamped)' : ''),
           folder: (it.path || []).join('\\') || '.',
-          status: it.rank === top.get(it.ext || 'pdf') ? 'Current' : 'Superseded',
+          status: it.rank === top.get(keyOf(it)) ? 'Current' : 'Superseded',
           size, mtime
         });
       }
@@ -1641,12 +1704,13 @@
           h.forEach((x, j) => rv.push([rv.length + 1, r ? r.doc : k, r ? r.title : '', j + 1]
             .concat(CZ_COLS.map((f) => f[1](x) || ''))
             .concat([x.rref || '', x.desc || '',
+                     (x.cmt || []).map((c) => c.name).join(' ; '),
                      r ? targetPath(r.doc, r.groupCode, r.groupName).join('\\') : ''])));
         }
         XLSX.utils.book_append_sheet(wb, mkSheet(
           [['S/N', 'Document No.', 'Title', 'No.'].concat(CZ_COLS.map((f) => f[0]))
-            .concat(['R.Ref', 'Description', 'Target Folder'])].concat(rv),
-          [6, 26, 46, 5].concat(CZ_COLS.map((f) => f[2])).concat([12, 30, 34])), 'ConZoL Revisions');
+            .concat(['R.Ref', 'Description', 'Comment File', 'Target Folder'])].concat(rv),
+          [6, 26, 46, 5].concat(CZ_COLS.map((f) => f[2])).concat([12, 30, 34, 34])), 'ConZoL Revisions');
         log(`  ชีต ConZoL Revisions: ${rv.length} Rev`, 'ok');
       }
 
