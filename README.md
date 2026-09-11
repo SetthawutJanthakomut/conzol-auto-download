@@ -153,7 +153,7 @@ its display name, so it keeps working when Chrome renumbers its profile folders.
 | **Folders** | Read from ConZoL's own group headers (`MA-CAL:MARINE Calculation`), never hard-coded — new disciplines and document types work with no changes |
 | **Areas** | `1400`, `0500`, `PCC`, `CAZ` … become sub-folders; add friendly labels in `AREA_LABELS` |
 | **Revisions** | Latest revision stays in place, older ones move to a `_Superseded\` folder inside the same document folder |
-| **Stamped copies** | PDF only, kept in `Comment File\` beside the document, with their own `_Superseded\` — never mixed up with the issued file |
+| **Stamped copies** | PDF only, kept in `Comment File\` beside the document, with their own `_Superseded\` — never mixed up with the issued file. The daily watch-list run downloads them too |
 | **Repeat runs** | Files already on disk are skipped — only new documents and changed revisions download |
 | **Cancelled docs** | Rows struck through or marked *Delete* in the MDR are ignored |
 | **Reporting** | **Save CSV report** lists what downloaded, what was skipped, what ConZoL does not have |

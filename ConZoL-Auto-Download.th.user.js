@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GULF ConZoL – Auto Download + Rename + Sort (MDR)
 // @namespace    gmtp.marine.jay
-// @version      6.4
+// @version      6.5
 // @description  ดาวน์โหลด PDF และไฟล์แนบ (FILE+) จาก ConZoL ลงโฟลเดอร์ที่เลือกไว้โดยตรง (ไม่ผ่าน Download ของ Chrome) ตั้งชื่อ <DocNo>-<Rev>_<Title>.pdf แยกโฟลเดอร์ตามหมวด ย้าย Rev เก่าเข้า _Superseded และอ่านรายการจากไฟล์ MDR ให้เอง
 // @author       JAY
 // @match        https://edms.gulf.co.th/dms/drawing.asp*
@@ -22,7 +22,7 @@
   // ถ้ามีกล่องอยู่แล้ว ให้ชุดที่มาทีหลังหยุดทำงาน ไม่งั้น id จะซ้ำและปุ่มจะกดไม่ติด
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '6.4';   // ซิงก์อัตโนมัติจาก @version ตอน build
+  const VERSION = '6.5';   // ซิงก์อัตโนมัติจาก @version ตอน build
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.th.user.js';   // build.py ใส่ให้ตามภาษา
 
   // ---------------- ตั้งค่าได้ตรงนี้ ----------------
@@ -779,6 +779,7 @@
         <fieldset><legend>ทำอัตโนมัติ</legend>
           <label><input type="checkbox" id="edl-auto"> ทำเองวันละครั้ง ตอนเปิดหน้า ConZoL</label>
           <div id="edl-autoinfo" class="hint">ยังไม่เคยรันอัตโนมัติ</div>
+          <div id="edl-autokinds" class="hint">—</div>
         </fieldset>
         <button class="chk" id="edl-watchcheck">เช็คก่อน (ไม่โหลดจริง)</button>
         <button class="go" id="edl-watchrun">โหลดตาม watchlist เดี๋ยวนี้</button>
@@ -1378,6 +1379,24 @@
     c.addEventListener('change', () => setLS('edms_cb_' + id, c.checked ? '1' : '0'));
   });
 
+  // งานประจำวันใช้ชนิดไฟล์ชุดเดียวกับแท็บ “โหลด” — เขียนบอกไว้ตรงนี้ จะได้ไม่ต้องเดา
+  function showAutoKinds() {
+    const d = el('edl-autokinds');
+    if (!d) return;
+    const on = [];
+    if (el('edl-getpdf').checked) on.push('PDF');
+    if (el('edl-getfile').checked) on.push('ไฟล์แนบต้นฉบับ');
+    if (el('edl-getstamp').checked) on.push('ไฟล์ที่มีตารางประทับ');
+    d.className = on.length ? 'hint' : 'wn';
+    d.innerHTML = on.length
+      ? 'งานประจำวันจะโหลด: <b>' + on.join(' · ') + '</b> — เปลี่ยนได้ที่แท็บ “โหลด”'
+      : '<b>ยังไม่ได้เลือกชนิดไฟล์</b> — ไปติ๊กที่แท็บ “โหลด” ก่อน ไม่งั้นงานประจำวันจะไม่โหลดอะไรเลย';
+  }
+  ['edl-getpdf', 'edl-getfile', 'edl-getstamp'].forEach((id) => {
+    const c = el(id); if (c) c.addEventListener('change', showAutoKinds);
+  });
+  showAutoKinds();
+
   el('edl-auto').checked = getLS(AUTO_KEY, '') === '1';
   el('edl-auto').onchange = () => { setLS(AUTO_KEY, el('edl-auto').checked ? '1' : '0'); showAutoInfo(); };
   el('edl-watchread').onclick = async () => { await ensurePermission(); showDirInfo(); showWatch(); };
@@ -1498,6 +1517,9 @@
       const names = await showWatch();
       if (!names.length) { log('· watchlist ว่าง — ยังไม่มีอะไรให้ทำ', 'er'); running = false; return; }
       log(`watchlist ${names.length} รายการ: ${names.join(', ')}`);
+      const kinds = [el('edl-getpdf').checked && 'PDF', el('edl-getfile').checked && 'ไฟล์แนบต้นฉบับ',
+                     el('edl-getstamp').checked && 'ไฟล์ที่มีตารางประทับ'].filter(Boolean);
+      log('ชนิดไฟล์ที่จะโหลด: ' + (kinds.join(' · ') || 'ยังไม่ได้เลือก'), kinds.length ? 'sk' : 'er');
       const items = await collectWatchRows(names);
       log(`พบใน ConZoL ${items.length} เอกสาร`, items.length ? 'ok' : 'er');
       if (items.length) {

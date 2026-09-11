@@ -1226,5 +1226,33 @@
  [
   "if (stray.length) log(`      ↳ ${stray[0].name} อยู่นอกโฟลเดอร์ Comment File — โหลดลงที่ใหม่ ลบตัวเก่าได้`, 'wn');",
   "if (stray.length) log(`      ↳ ${stray[0].name} sits outside the Comment File folder - downloading to the new place, the old one can be deleted`, 'wn');"
+ ],
+ [
+  "// งานประจำวันใช้ชนิดไฟล์ชุดเดียวกับแท็บ “โหลด” — เขียนบอกไว้ตรงนี้ จะได้ไม่ต้องเดา",
+  "// The daily run uses the same file types as the Download tab - spell it out here so nobody has to guess"
+ ],
+ [
+  "if (el('edl-getfile').checked) on.push('ไฟล์แนบต้นฉบับ');",
+  "if (el('edl-getfile').checked) on.push('Native attachment');"
+ ],
+ [
+  "if (el('edl-getstamp').checked) on.push('ไฟล์ที่มีตารางประทับ');",
+  "if (el('edl-getstamp').checked) on.push('Stamped copy');"
+ ],
+ [
+  "? 'งานประจำวันจะโหลด: <b>' + on.join(' · ') + '</b> — เปลี่ยนได้ที่แท็บ “โหลด”'",
+  "? 'The daily run downloads: <b>' + on.join(' · ') + '</b> - change it on the Download tab'"
+ ],
+ [
+  ": '<b>ยังไม่ได้เลือกชนิดไฟล์</b> — ไปติ๊กที่แท็บ “โหลด” ก่อน ไม่งั้นงานประจำวันจะไม่โหลดอะไรเลย';",
+  ": '<b>No file type selected</b> - tick one on the Download tab, or the daily run downloads nothing';"
+ ],
+ [
+  "const kinds = [el('edl-getpdf').checked && 'PDF', el('edl-getfile').checked && 'ไฟล์แนบต้นฉบับ',\n                     el('edl-getstamp').checked && 'ไฟล์ที่มีตารางประทับ'].filter(Boolean);",
+  "const kinds = [el('edl-getpdf').checked && 'PDF', el('edl-getfile').checked && 'Native attachment',\n                     el('edl-getstamp').checked && 'Stamped copy'].filter(Boolean);"
+ ],
+ [
+  "log('ชนิดไฟล์ที่จะโหลด: ' + (kinds.join(' · ') || 'ยังไม่ได้เลือก'), kinds.length ? 'sk' : 'er');",
+  "log('File types to download: ' + (kinds.join(' · ') || 'none selected'), kinds.length ? 'sk' : 'er');"
  ]
 ]

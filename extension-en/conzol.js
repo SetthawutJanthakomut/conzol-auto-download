@@ -6,7 +6,7 @@
   // If a panel already exists the later copy stops here - otherwise ids collide and buttons stop responding
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '6.4';   // kept in sync with @version at build time
+  const VERSION = '6.5';   // kept in sync with @version at build time
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.user.js';   // filled in per language at build time
 
   // ---------------- Settings ----------------
@@ -780,6 +780,7 @@
         <fieldset><legend>Run on its own</legend>
           <label><input type="checkbox" id="edl-auto"> Once a day, when the ConZoL page opens</label>
           <div id="edl-autoinfo" class="hint">Has not run on its own yet</div>
+          <div id="edl-autokinds" class="hint">—</div>
         </fieldset>
         <button class="chk" id="edl-watchcheck">Check first (no download)</button>
         <button class="go" id="edl-watchrun">Download the watch list now</button>
@@ -1379,6 +1380,24 @@
     c.addEventListener('change', () => setLS('edms_cb_' + id, c.checked ? '1' : '0'));
   });
 
+  // The daily run uses the same file types as the Download tab - spell it out here so nobody has to guess
+  function showAutoKinds() {
+    const d = el('edl-autokinds');
+    if (!d) return;
+    const on = [];
+    if (el('edl-getpdf').checked) on.push('PDF');
+    if (el('edl-getfile').checked) on.push('Native attachment');
+    if (el('edl-getstamp').checked) on.push('Stamped copy');
+    d.className = on.length ? 'hint' : 'wn';
+    d.innerHTML = on.length
+      ? 'The daily run downloads: <b>' + on.join(' · ') + '</b> - change it on the Download tab'
+      : '<b>No file type selected</b> - tick one on the Download tab, or the daily run downloads nothing';
+  }
+  ['edl-getpdf', 'edl-getfile', 'edl-getstamp'].forEach((id) => {
+    const c = el(id); if (c) c.addEventListener('change', showAutoKinds);
+  });
+  showAutoKinds();
+
   el('edl-auto').checked = getLS(AUTO_KEY, '') === '1';
   el('edl-auto').onchange = () => { setLS(AUTO_KEY, el('edl-auto').checked ? '1' : '0'); showAutoInfo(); };
   el('edl-watchread').onclick = async () => { await ensurePermission(); showDirInfo(); showWatch(); };
@@ -1499,6 +1518,9 @@
       const names = await showWatch();
       if (!names.length) { log('· The watch list is empty - nothing to do', 'er'); running = false; return; }
       log(`Watch list - ${names.length} entries: ${names.join(', ')}`);
+      const kinds = [el('edl-getpdf').checked && 'PDF', el('edl-getfile').checked && 'Native attachment',
+                     el('edl-getstamp').checked && 'Stamped copy'].filter(Boolean);
+      log('File types to download: ' + (kinds.join(' · ') || 'none selected'), kinds.length ? 'sk' : 'er');
       const items = await collectWatchRows(names);
       log(`${items.length} documents found in ConZoL`, items.length ? 'ok' : 'er');
       if (items.length) {
