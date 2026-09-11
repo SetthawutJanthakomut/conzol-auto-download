@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GULF ConZoL - Auto Download + Rename + Sort
 // @namespace    gmtp.conzol
-// @version      6.2
+// @version      6.3
 // @description  Download PDFs and native attachments from GULF ConZoL EDMS automatically - names each file and sorts it into the folder ConZoL assigns.
 // @match        https://edms.gulf.co.th/dms/drawing.asp*
 // @match        http://edms.gulf.co.th/dms/drawing.asp*
@@ -22,7 +22,7 @@
   // If a panel already exists the later copy stops here - otherwise ids collide and buttons stop responding
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '6.2';   // kept in sync with @version at build time
+  const VERSION = '6.3';   // kept in sync with @version at build time
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.user.js';   // filled in per language at build time
 
   // ---------------- Settings ----------------
@@ -421,17 +421,37 @@
     const res = await fetch('getdoc.asp?did=' + fileid + '&rx=' + Math.random(), { credentials: 'same-origin' });
     if (!res.ok) throw new Error('getdoc.asp HTTP ' + res.status);
     const d = new DOMParser().parseFromString('<table>' + (await res.text()) + '</table>', 'text/html');
+    const rows = [...d.querySelectorAll('tr')];
+    const cellText = (x) => String(x.innerText || x.textContent || '').replace(/\s+/g, ' ').trim();
+
+    // Start from the column order ConZoL uses today, then correct it from the real header row
+    const IX = { rev: 0, status: 1, iss: 2, trd: 3, no: 4, code: 5,
+                 rcode: 6, rdate: 7, rref: 8, desc: 9, cmt: 10, file: 11 };
+    for (const tr of rows) {
+      const c = tr.cells;
+      if (!c || c.length < 6) continue;
+      const txt = [...c].map((x) => cellText(x).toLowerCase());
+      if (!txt.some((t) => /comment\s*file/.test(t))) continue;
+      const set = (k, re) => { const i = txt.findIndex((t) => re.test(t)); if (i >= 0) IX[k] = i; };
+      set('rev', /^rev/); set('status', /^status/); set('iss', /^iss/); set('trd', /^tr\.?\s*date/);
+      set('no', /^(no|transmittal)/); set('code', /^code$/); set('rcode', /^r\.?\s*code/);
+      set('rdate', /^r\.?\s*date/); set('rref', /^r\.?\s*ref/); set('desc', /^desc/);
+      set('cmt', /comment\s*file/); set('file', /^file$/);
+      break;
+    }
+    const need = Math.max(...Object.values(IX)) + 1;
+
     const out = [];
     let last = null;                              // last Rev row kept, in case attachments sit in a sub-row
-    for (const tr of d.querySelectorAll('tr')) {
+    for (const tr of rows) {
       const c = tr.cells;
       if (!c) continue;
 
-      // Attachment sub-rows have 2 cells - keep only links whose name appears in the Comment File cell
-      if (c.length < 12) {
+      // Attachment sub-rows have only a few cells - keep only links whose name appears in the Comment File cell
+      if (c.length < need) {
         if (last && last._cmtText) {
           for (const a of tr.querySelectorAll('a')) {
-            const nm = String(a.innerText || '').replace(/\s+/g, ' ').trim();
+            const nm = cellText(a);
             const u = linkUrl(a);
             if (!nm || !u || !last._cmtText.includes(nm)) continue;
             if (!last.cmt.some((x) => x.href === u)) last.cmt.push({ name: nm, href: u });
@@ -440,23 +460,23 @@
         continue;
       }
 
-      const t = (i) => String(c[i].innerText || '').replace(/\s+/g, ' ').trim();
-      const rev = t(0);
+      const t = (i) => cellText(c[i]);
+      const rev = t(IX.rev);
       if (!/^[A-Z]+\d+$/i.test(rev)) { last = null; continue; }   // the header row
-      const fa = c[11].querySelector('a[href*="getfile.asp"]');
+      const fa = c[IX.file].querySelector('a[href*="getfile.asp"]');
       // Comment File column = the copy the owner returned, carrying the review stamp box (CONSOL_*.pdf)
       const cmt = [];
-      for (const a of c[10].querySelectorAll('a')) {
+      for (const a of c[IX.cmt].querySelectorAll('a')) {
         const u = linkUrl(a);
         if (!u) continue;
-        const nm = String(a.innerText || '').replace(/\s+/g, ' ').trim();
+        const nm = cellText(a);
         if (!cmt.some((x) => x.href === u)) cmt.push({ name: nm, href: u });
       }
       last = {
-        rev: rev.toUpperCase(), status: t(1), iss: t(2), trd: t(3), no: t(4),
-        code: t(5), rcode: t(6), rdate: t(7), rref: t(8), desc: t(9),
+        rev: rev.toUpperCase(), status: t(IX.status), iss: t(IX.iss), trd: t(IX.trd), no: t(IX.no),
+        code: t(IX.code), rcode: t(IX.rcode), rdate: t(IX.rdate), rref: t(IX.rref), desc: t(IX.desc),
         href: fa ? fa.getAttribute('href') : '',
-        cmt, _cmtText: t(10)
+        cmt, _cmtText: t(IX.cmt)
       };
       out.push(last);
     }
@@ -1146,7 +1166,13 @@
         // One transmittal can carry other documents' files - keep those naming this document, else take them all
         const mine = all.filter((x) => norm(x.name).includes(norm(doc)));
         const pick = mine.length ? mine : all;
-        if (!pick.length && hist.length) log(`      ↳ ${doc} has no stamped PDF in the Comment File column yet`, 'sk');
+        if (!pick.length && hist.length) {
+          log(`      ↳ ${doc} has no stamped PDF in the Comment File column yet`, 'sk');
+          // Show what the history table actually gave us, so it is clear where it stopped
+          log('         read ' + hist.length + ' revisions - ' + hist.slice(-3).map((x) =>
+            `${x.rev}: ${(x._cmtText || '(empty)').slice(0, 50)} [links ${(x.cmt || []).length}]`).join(' · '), 'sk');
+        }
+        if (!hist.length) log(`      ↳ ${doc}: could not read the history table at all (getdoc.asp returned no usable rows)`, 'wn');
         if (src && norm(src.rev) !== norm(r.rev)) log(`      ↳ ${doc}: the latest stamped copy is ${src.rev} (Rev ${r.rev} has no reply yet)`, 'wn');
         const sRow = src ? { ...r, rev: src.rev, rcode: src.rcode || '' } : r;
         const sRank = src ? rankOfRev(src.rev) : rank;

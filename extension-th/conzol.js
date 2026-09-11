@@ -8,7 +8,7 @@
   // ถ้ามีกล่องอยู่แล้ว ให้ชุดที่มาทีหลังหยุดทำงาน ไม่งั้น id จะซ้ำและปุ่มจะกดไม่ติด
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '6.2';   // ซิงก์อัตโนมัติจาก @version ตอน build
+  const VERSION = '6.3';   // ซิงก์อัตโนมัติจาก @version ตอน build
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.th.user.js';   // build.py ใส่ให้ตามภาษา
 
   // ---------------- ตั้งค่าได้ตรงนี้ ----------------
@@ -407,17 +407,37 @@
     const res = await fetch('getdoc.asp?did=' + fileid + '&rx=' + Math.random(), { credentials: 'same-origin' });
     if (!res.ok) throw new Error('getdoc.asp HTTP ' + res.status);
     const d = new DOMParser().parseFromString('<table>' + (await res.text()) + '</table>', 'text/html');
+    const rows = [...d.querySelectorAll('tr')];
+    const cellText = (x) => String(x.innerText || x.textContent || '').replace(/\s+/g, ' ').trim();
+
+    // ตำแหน่งคอลัมน์เริ่มจากที่ ConZoL ใช้อยู่ แล้วแก้ตามหัวตารางจริงถ้าหาเจอ
+    const IX = { rev: 0, status: 1, iss: 2, trd: 3, no: 4, code: 5,
+                 rcode: 6, rdate: 7, rref: 8, desc: 9, cmt: 10, file: 11 };
+    for (const tr of rows) {
+      const c = tr.cells;
+      if (!c || c.length < 6) continue;
+      const txt = [...c].map((x) => cellText(x).toLowerCase());
+      if (!txt.some((t) => /comment\s*file/.test(t))) continue;
+      const set = (k, re) => { const i = txt.findIndex((t) => re.test(t)); if (i >= 0) IX[k] = i; };
+      set('rev', /^rev/); set('status', /^status/); set('iss', /^iss/); set('trd', /^tr\.?\s*date/);
+      set('no', /^(no|transmittal)/); set('code', /^code$/); set('rcode', /^r\.?\s*code/);
+      set('rdate', /^r\.?\s*date/); set('rref', /^r\.?\s*ref/); set('desc', /^desc/);
+      set('cmt', /comment\s*file/); set('file', /^file$/);
+      break;
+    }
+    const need = Math.max(...Object.values(IX)) + 1;
+
     const out = [];
     let last = null;                              // แถว Rev ล่าสุดที่เก็บไว้ เผื่อไฟล์แนบอยู่แถวย่อย
-    for (const tr of d.querySelectorAll('tr')) {
+    for (const tr of rows) {
       const c = tr.cells;
       if (!c) continue;
 
-      // แถวย่อยของไฟล์แนบมี 2 ช่อง — เก็บเฉพาะลิงก์ที่ชื่อตรงกับที่เขียนไว้ในช่อง Comment File
-      if (c.length < 12) {
+      // แถวย่อยของไฟล์แนบมีไม่กี่ช่อง — เก็บเฉพาะลิงก์ที่ชื่อตรงกับที่เขียนไว้ในช่อง Comment File
+      if (c.length < need) {
         if (last && last._cmtText) {
           for (const a of tr.querySelectorAll('a')) {
-            const nm = String(a.innerText || '').replace(/\s+/g, ' ').trim();
+            const nm = cellText(a);
             const u = linkUrl(a);
             if (!nm || !u || !last._cmtText.includes(nm)) continue;
             if (!last.cmt.some((x) => x.href === u)) last.cmt.push({ name: nm, href: u });
@@ -426,23 +446,23 @@
         continue;
       }
 
-      const t = (i) => String(c[i].innerText || '').replace(/\s+/g, ' ').trim();
-      const rev = t(0);
+      const t = (i) => cellText(c[i]);
+      const rev = t(IX.rev);
       if (!/^[A-Z]+\d+$/i.test(rev)) { last = null; continue; }   // แถวหัวตาราง
-      const fa = c[11].querySelector('a[href*="getfile.asp"]');
+      const fa = c[IX.file].querySelector('a[href*="getfile.asp"]');
       // ช่อง Comment File = ไฟล์ที่ผู้ว่าจ้างส่งกลับมา มีตารางตราประทับ (CONSOL_*.pdf)
       const cmt = [];
-      for (const a of c[10].querySelectorAll('a')) {
+      for (const a of c[IX.cmt].querySelectorAll('a')) {
         const u = linkUrl(a);
         if (!u) continue;
-        const nm = String(a.innerText || '').replace(/\s+/g, ' ').trim();
+        const nm = cellText(a);
         if (!cmt.some((x) => x.href === u)) cmt.push({ name: nm, href: u });
       }
       last = {
-        rev: rev.toUpperCase(), status: t(1), iss: t(2), trd: t(3), no: t(4),
-        code: t(5), rcode: t(6), rdate: t(7), rref: t(8), desc: t(9),
+        rev: rev.toUpperCase(), status: t(IX.status), iss: t(IX.iss), trd: t(IX.trd), no: t(IX.no),
+        code: t(IX.code), rcode: t(IX.rcode), rdate: t(IX.rdate), rref: t(IX.rref), desc: t(IX.desc),
         href: fa ? fa.getAttribute('href') : '',
-        cmt, _cmtText: t(10)
+        cmt, _cmtText: t(IX.cmt)
       };
       out.push(last);
     }
@@ -1132,7 +1152,13 @@
         // ใบเดียวกันอาจแนบไฟล์ของเอกสารอื่นมาด้วย — เอาเฉพาะที่ชื่อมีเลขเอกสารนี้ ถ้าไม่มีเลยค่อยเอาทั้งหมด
         const mine = all.filter((x) => norm(x.name).includes(norm(doc)));
         const pick = mine.length ? mine : all;
-        if (!pick.length && hist.length) log(`      ↳ ${doc} ยังไม่มีไฟล์ตราประทับ (PDF) ในช่อง Comment File`, 'sk');
+        if (!pick.length && hist.length) {
+          log(`      ↳ ${doc} ยังไม่มีไฟล์ตราประทับ (PDF) ในช่อง Comment File`, 'sk');
+          // บอกให้เห็นว่าอ่านตารางประวัติได้อะไรมาบ้าง จะได้รู้ว่าติดตรงไหน
+          log('         อ่านได้ ' + hist.length + ' Rev — ' + hist.slice(-3).map((x) =>
+            `${x.rev}: ${(x._cmtText || '(ว่าง)').slice(0, 50)} [ลิงก์ ${(x.cmt || []).length}]`).join(' · '), 'sk');
+        }
+        if (!hist.length) log(`      ↳ ${doc} อ่านตารางประวัติไม่ได้เลย (getdoc.asp ไม่คืนแถวที่ใช้ได้)`, 'wn');
         if (src && norm(src.rev) !== norm(r.rev)) log(`      ↳ ${doc}: ตราประทับล่าสุดเป็นของ ${src.rev} (Rev ${r.rev} ยังไม่ตอบกลับ)`, 'wn');
         const sRow = src ? { ...r, rev: src.rev, rcode: src.rcode || '' } : r;
         const sRank = src ? rankOfRev(src.rev) : rank;

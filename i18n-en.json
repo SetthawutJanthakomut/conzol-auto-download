@@ -1120,10 +1120,6 @@
   "let last = null;                              // last Rev row kept, in case attachments sit in a sub-row"
  ],
  [
-  "// แถวย่อยของไฟล์แนบมี 2 ช่อง — เก็บเฉพาะลิงก์ที่ชื่อตรงกับที่เขียนไว้ในช่อง Comment File",
-  "// Attachment sub-rows have 2 cells - keep only links whose name appears in the Comment File cell"
- ],
- [
   "// ช่อง Comment File = ไฟล์ที่ผู้ว่าจ้างส่งกลับมา มีตารางตราประทับ (CONSOL_*.pdf)",
   "// Comment File column = the copy the owner returned, carrying the review stamp box (CONSOL_*.pdf)"
  ],
@@ -1192,7 +1188,31 @@
   "// PDF only - comment sheets attached as .xls/.doc are not wanted"
  ],
  [
-  "if (!pick.length && hist.length) log(`      ↳ ${doc} ยังไม่มีไฟล์ตราประทับ (PDF) ในช่อง Comment File`, 'sk');",
-  "if (!pick.length && hist.length) log(`      ↳ ${doc} has no stamped PDF in the Comment File column yet`, 'sk');"
+  "// ตำแหน่งคอลัมน์เริ่มจากที่ ConZoL ใช้อยู่ แล้วแก้ตามหัวตารางจริงถ้าหาเจอ",
+  "// Start from the column order ConZoL uses today, then correct it from the real header row"
+ ],
+ [
+  "// แถวย่อยของไฟล์แนบมีไม่กี่ช่อง — เก็บเฉพาะลิงก์ที่ชื่อตรงกับที่เขียนไว้ในช่อง Comment File",
+  "// Attachment sub-rows have only a few cells - keep only links whose name appears in the Comment File cell"
+ ],
+ [
+  "log(`      ↳ ${doc} ยังไม่มีไฟล์ตราประทับ (PDF) ในช่อง Comment File`, 'sk');",
+  "log(`      ↳ ${doc} has no stamped PDF in the Comment File column yet`, 'sk');"
+ ],
+ [
+  "// บอกให้เห็นว่าอ่านตารางประวัติได้อะไรมาบ้าง จะได้รู้ว่าติดตรงไหน",
+  "// Show what the history table actually gave us, so it is clear where it stopped"
+ ],
+ [
+  "log('         อ่านได้ ' + hist.length + ' Rev — ' + hist.slice(-3).map((x) =>",
+  "log('         read ' + hist.length + ' revisions - ' + hist.slice(-3).map((x) =>"
+ ],
+ [
+  "`${x.rev}: ${(x._cmtText || '(ว่าง)').slice(0, 50)} [ลิงก์ ${(x.cmt || []).length}]`).join(' · '), 'sk');",
+  "`${x.rev}: ${(x._cmtText || '(empty)').slice(0, 50)} [links ${(x.cmt || []).length}]`).join(' · '), 'sk');"
+ ],
+ [
+  "if (!hist.length) log(`      ↳ ${doc} อ่านตารางประวัติไม่ได้เลย (getdoc.asp ไม่คืนแถวที่ใช้ได้)`, 'wn');",
+  "if (!hist.length) log(`      ↳ ${doc}: could not read the history table at all (getdoc.asp returned no usable rows)`, 'wn');"
  ]
 ]
