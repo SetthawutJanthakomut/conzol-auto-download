@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GULF ConZoL - Auto Download + Rename + Sort
 // @namespace    gmtp.conzol
-// @version      6.3
+// @version      6.4
 // @description  Download PDFs and native attachments from GULF ConZoL EDMS automatically - names each file and sorts it into the folder ConZoL assigns.
 // @match        https://edms.gulf.co.th/dms/drawing.asp*
 // @match        http://edms.gulf.co.th/dms/drawing.asp*
@@ -22,7 +22,7 @@
   // If a panel already exists the later copy stops here - otherwise ids collide and buttons stop responding
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '6.3';   // kept in sync with @version at build time
+  const VERSION = '6.4';   // kept in sync with @version at build time
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.user.js';   // filled in per language at build time
 
   // ---------------- Settings ----------------
@@ -1195,8 +1195,14 @@
         const name = safeName(kr, k.ext, k.dup);
         const kind = k.stamp ? 'stamp' : 'file';
         const sameKind = (h) => (h.ext || 'pdf') === k.ext && (h.kind || 'file') === kind;
+        // A stamped copy only counts as already there when it really sits in the Comment File folder
+        // One left beside the issued file by 6.0 has to be downloaded to the new place, not skipped
+        const inPlace = (h) => kind !== 'stamp' || isStampPath(h.path);
+        const stray = have.filter((h) => kind === 'stamp' && h.rev === String(kr.rev).toUpperCase()
+                                          && sameKind(h) && !isStampPath(h.path));
+        if (stray.length) log(`      ↳ ${stray[0].name} sits outside the Comment File folder - downloading to the new place, the old one can be deleted`, 'wn');
 
-        if (skip && have.some((h) => h.rev === String(kr.rev).toUpperCase() && sameKind(h))) {
+        if (skip && have.some((h) => h.rev === String(kr.rev).toUpperCase() && sameKind(h) && inPlace(h))) {
           skipped++;
           lastReport.push({ ...kr, result: 'Skipped (already present)', file: name, folder: '' });
           log(`[${i}/${items.length}] skipped ${name}`, 'sk');

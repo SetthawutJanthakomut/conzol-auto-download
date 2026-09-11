@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GULF ConZoL – Auto Download + Rename + Sort (MDR)
 // @namespace    gmtp.marine.jay
-// @version      6.3
+// @version      6.4
 // @description  ดาวน์โหลด PDF และไฟล์แนบ (FILE+) จาก ConZoL ลงโฟลเดอร์ที่เลือกไว้โดยตรง (ไม่ผ่าน Download ของ Chrome) ตั้งชื่อ <DocNo>-<Rev>_<Title>.pdf แยกโฟลเดอร์ตามหมวด ย้าย Rev เก่าเข้า _Superseded และอ่านรายการจากไฟล์ MDR ให้เอง
 // @author       JAY
 // @match        https://edms.gulf.co.th/dms/drawing.asp*
@@ -22,7 +22,7 @@
   // ถ้ามีกล่องอยู่แล้ว ให้ชุดที่มาทีหลังหยุดทำงาน ไม่งั้น id จะซ้ำและปุ่มจะกดไม่ติด
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '6.3';   // ซิงก์อัตโนมัติจาก @version ตอน build
+  const VERSION = '6.4';   // ซิงก์อัตโนมัติจาก @version ตอน build
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.th.user.js';   // build.py ใส่ให้ตามภาษา
 
   // ---------------- ตั้งค่าได้ตรงนี้ ----------------
@@ -1178,8 +1178,14 @@
         const name = safeName(kr, k.ext, k.dup);
         const kind = k.stamp ? 'stamp' : 'file';
         const sameKind = (h) => (h.ext || 'pdf') === k.ext && (h.kind || 'file') === kind;
+        // ไฟล์ตราประทับจะนับว่า "มีแล้ว" ก็ต่อเมื่ออยู่ในโฟลเดอร์ Comment File จริง ๆ
+        // ของเก่าที่รุ่น 6.0 วางไว้ข้างต้นฉบับ ต้องโหลดลงที่ใหม่ ไม่ใช่ข้าม
+        const inPlace = (h) => kind !== 'stamp' || isStampPath(h.path);
+        const stray = have.filter((h) => kind === 'stamp' && h.rev === String(kr.rev).toUpperCase()
+                                          && sameKind(h) && !isStampPath(h.path));
+        if (stray.length) log(`      ↳ ${stray[0].name} อยู่นอกโฟลเดอร์ Comment File — โหลดลงที่ใหม่ ลบตัวเก่าได้`, 'wn');
 
-        if (skip && have.some((h) => h.rev === String(kr.rev).toUpperCase() && sameKind(h))) {
+        if (skip && have.some((h) => h.rev === String(kr.rev).toUpperCase() && sameKind(h) && inPlace(h))) {
           skipped++;
           lastReport.push({ ...kr, result: 'ข้าม (มีอยู่แล้ว)', file: name, folder: '' });
           log(`[${i}/${items.length}] ข้าม ${name}`, 'sk');

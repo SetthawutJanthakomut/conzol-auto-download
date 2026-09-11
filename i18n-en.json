@@ -1214,5 +1214,17 @@
  [
   "if (!hist.length) log(`      ↳ ${doc} อ่านตารางประวัติไม่ได้เลย (getdoc.asp ไม่คืนแถวที่ใช้ได้)`, 'wn');",
   "if (!hist.length) log(`      ↳ ${doc}: could not read the history table at all (getdoc.asp returned no usable rows)`, 'wn');"
+ ],
+ [
+  "// ไฟล์ตราประทับจะนับว่า \"มีแล้ว\" ก็ต่อเมื่ออยู่ในโฟลเดอร์ Comment File จริง ๆ",
+  "// A stamped copy only counts as already there when it really sits in the Comment File folder"
+ ],
+ [
+  "// ของเก่าที่รุ่น 6.0 วางไว้ข้างต้นฉบับ ต้องโหลดลงที่ใหม่ ไม่ใช่ข้าม",
+  "// One left beside the issued file by 6.0 has to be downloaded to the new place, not skipped"
+ ],
+ [
+  "if (stray.length) log(`      ↳ ${stray[0].name} อยู่นอกโฟลเดอร์ Comment File — โหลดลงที่ใหม่ ลบตัวเก่าได้`, 'wn');",
+  "if (stray.length) log(`      ↳ ${stray[0].name} sits outside the Comment File folder - downloading to the new place, the old one can be deleted`, 'wn');"
  ]
 ]
