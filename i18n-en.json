@@ -1268,27 +1268,31 @@
   "// _Updated holds copies, not the real files - never scan or re-sort it, or they count as already downloaded"
  ],
  [
-  "if (copyNew && useFS) log(`      ↳ สำเนาไป ${upParts.concat(k.sub || []).join('\\\\')}`, 'sk');",
-  "if (copyNew && useFS) log(`      ↳ copy to ${upParts.concat(k.sub || []).join('\\\\')}`, 'sk');"
- ],
- [
   "} catch (e) { log(`      ↳ ทำสำเนาไป ${CFG.updatedDir} ไม่สำเร็จ: ${e.message}`, 'wn'); }",
   "} catch (e) { log(`      ↳ could not copy into ${CFG.updatedDir}: ${e.message}`, 'wn'); }"
  ],
  [
-  "updatedDir: '_Updated',       // สำเนาไฟล์ที่เพิ่งโหลดใหม่ อยู่ในโฟลเดอร์ของเอกสารนั้นเอง เหมือน Comment File",
-  "updatedDir: '_Updated',       // a copy of whatever was just downloaded, in the document's own folder, like Comment File"
+  "updatedDir: '_Updated',       // สำเนาไฟล์ที่เพิ่งโหลดใหม่ กองรวมโฟลเดอร์เดียวที่ชั้นนอกสุด",
+  "updatedDir: '_Updated',       // copies of whatever was just downloaded, all in one folder at the top"
  ],
  [
-  "<label><input type=\"checkbox\" id=\"edl-copynew\" checked> คัดลอกไฟล์ที่โหลดใหม่ไว้ในโฟลเดอร์ย่อย <b>_Updated</b> ด้วย</label>",
-  "<label><input type=\"checkbox\" id=\"edl-copynew\" checked> Also keep a copy of anything newly downloaded in an <b>_Updated</b> sub-folder</label>"
+  "// ชื่อสำเนาใน _Updated — กองรวมโฟลเดอร์เดียว ไฟล์ตราประทับจึงต้องเติมท้ายกันชนกับ PDF ต้นฉบับ",
+  "// Name for the copy in _Updated - one flat folder, so a stamped copy needs a suffix to not overwrite the plain PDF"
  ],
  [
-  "<div class=\"hint\">วางแบบเดียวกับ Comment File คือ <b>_Updated</b> อยู่ในโฟลเดอร์ของเอกสารนั้นเอง · เป็นสำเนา ไฟล์จริงยังอยู่ที่เดิม อ่านแล้วลบทิ้งได้ตลอด</div>",
-  "<div class=\"hint\">Placed the same way as Comment File: <b>_Updated</b> sits inside the document's own folder. It is a copy - the real file stays where it was, so delete these once you have read them.</div>"
+  "<label><input type=\"checkbox\" id=\"edl-copynew\" checked> คัดลอกไฟล์ที่โหลดใหม่ไว้ในโฟลเดอร์ <b>_Updated</b> ด้วย</label>",
+  "<label><input type=\"checkbox\" id=\"edl-copynew\" checked> Also copy anything newly downloaded into an <b>_Updated</b> folder</label>"
  ],
  [
-  "// สำเนาไว้ในโฟลเดอร์ย่อย _Updated ของที่เดียวกับไฟล์จริง — วางแบบเดียวกับ Comment File",
-  "// Copy into an _Updated sub-folder next to the real file - placed the same way as Comment File"
+  "<div class=\"hint\">โฟลเดอร์เดียวที่ชั้นนอกสุด กองรวมกันหมด ไม่แยกวันที่ ไม่มีโฟลเดอร์ย่อย · เป็นสำเนา ไฟล์จริงยังอยู่ที่เดิม อ่านแล้วลบทิ้งได้ตลอด</div>",
+  "<div class=\"hint\">One folder at the top level, everything together - no date folders, no sub-folders. These are copies; the real files stay where they are, so delete them once read.</div>"
+ ],
+ [
+  "if (copyNew && useFS) log(`      ↳ สำเนาไป ${CFG.updatedDir}\\\\${copyName(name, k.stamp)}`, 'sk');",
+  "if (copyNew && useFS) log(`      ↳ copy to ${CFG.updatedDir}\\\\${copyName(name, k.stamp)}`, 'sk');"
+ ],
+ [
+  "// สำเนาไว้ใน _Updated ที่ชั้นนอกสุด — กองรวมกันหมด ไม่แยกวันที่ ไม่มีโฟลเดอร์ย่อย",
+  "// Copy into _Updated at the top level - everything together, no date folders, no sub-folders"
  ]
 ]

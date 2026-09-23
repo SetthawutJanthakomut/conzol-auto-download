@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GULF ConZoL - Auto Download + Rename + Sort
 // @namespace    gmtp.conzol
-// @version      6.8
+// @version      6.9
 // @description  Download PDFs and native attachments from GULF ConZoL EDMS automatically - names each file and sorts it into the folder ConZoL assigns.
 // @match        https://edms.gulf.co.th/dms/drawing.asp*
 // @match        http://edms.gulf.co.th/dms/drawing.asp*
@@ -22,7 +22,7 @@
   // If a panel already exists the later copy stops here - otherwise ids collide and buttons stop responding
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '6.8';   // kept in sync with @version at build time
+  const VERSION = '6.9';   // kept in sync with @version at build time
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.user.js';   // filled in per language at build time
 
   // ---------------- Settings ----------------
@@ -37,7 +37,7 @@
     supersededDir: '_Superseded',
     commentDir: 'Comment File',   // the stamped copies the owner returns, kept with the document itself
     unsortedDir: '_Unsorted',
-    updatedDir: '_Updated',       // a copy of whatever was just downloaded, in the document's own folder, like Comment File
+    updatedDir: '_Updated',       // copies of whatever was just downloaded, all in one folder at the top
     // Folders never touched - not scanned, not re-sorted (cancelled MDR documents live here)
     // _Updated holds copies, not the real files - never scan or re-sort it, or they count as already downloaded
     ignoreDirs: ['_Deleted', '_Archive', '_Cancelled', '_Updated']
@@ -150,6 +150,13 @@
     const room = CFG.maxNameLen - sfx.length;
     if (base.length > room) base = base.slice(0, room).trim();
     return base + sfx + '.' + String(ext || 'pdf').toLowerCase();
+  }
+
+  // Name for the copy in _Updated - one flat folder, so a stamped copy needs a suffix to not overwrite the plain PDF
+  function copyName(name, stamp) {
+    if (!stamp) return name;
+    const dot = String(name).lastIndexOf('.');
+    return dot > 0 ? name.slice(0, dot) + ' (Stamped)' + name.slice(dot) : name + ' (Stamped)';
   }
 
   const sanitizeFolder = (s) => String(s).replace(/[\\/:*?"<>|\r\n\t]/g, '-')
@@ -822,8 +829,8 @@
         <label><input type="checkbox" id="edl-rcode" checked> Add R.Code after the revision in the file name (…-T0-AC_…)</label>
         <label><input type="checkbox" id="edl-area" checked> Sub-folder per area code (1400 / 0500 / PCC …)</label>
         <label><input type="checkbox" id="edl-inactive"> Include non-active documents in search</label>
-        <label><input type="checkbox" id="edl-copynew" checked> Also keep a copy of anything newly downloaded in an <b>_Updated</b> sub-folder</label>
-        <div class="hint">Placed the same way as Comment File: <b>_Updated</b> sits inside the document's own folder. It is a copy - the real file stays where it was, so delete these once you have read them.</div>
+        <label><input type="checkbox" id="edl-copynew" checked> Also copy anything newly downloaded into an <b>_Updated</b> folder</label>
+        <div class="hint">One folder at the top level, everything together - no date folders, no sub-folders. These are copies; the real files stay where they are, so delete them once read.</div>
         <button id="edl-csv">Save CSV report</button>
       </div>
 
@@ -1228,7 +1235,7 @@
           sup += willSup.length;
           lastReport.push({ ...kr, result: 'Will download', file: name, folder: kParts.join('\\') });
           log(`[${i}/${items.length}] + ${name}  →  ${kParts.join('\\')}`, 'ok');
-          if (copyNew && useFS) log(`      ↳ copy to ${upParts.concat(k.sub || []).join('\\')}`, 'sk');
+          if (copyNew && useFS) log(`      ↳ copy to ${CFG.updatedDir}\\${copyName(name, k.stamp)}`, 'sk');
           for (const h of willSup) {
             lastReport.push({ ...kr, rev: h.rev, result: 'Will move to _Superseded', file: h.name,
                               folder: (h.path || kParts).concat(CFG.supersededDir).join('\\') });
@@ -1259,10 +1266,10 @@
                 have.push({ name, rev: String(kr.rev).toUpperCase(), rank: kRank, ext: k.ext, kind,
                             parent: dir, path: kParts, handle: await dir.getFileHandle(name) });
               } catch (e) {}
-              // Copy into an _Updated sub-folder next to the real file - placed the same way as Comment File
+              // Copy into _Updated at the top level - everything together, no date folders, no sub-folders
               if (copyNew) {
                 try {
-                  await writeInto(await ensureDir(kParts.concat(CFG.updatedDir)), name, blob);
+                  await writeInto(await ensureDir([CFG.updatedDir]), copyName(name, k.stamp), blob);
                 } catch (e) { log(`      ↳ could not copy into ${CFG.updatedDir}: ${e.message}`, 'wn'); }
               }
             } else {

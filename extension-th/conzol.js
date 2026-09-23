@@ -8,7 +8,7 @@
   // ถ้ามีกล่องอยู่แล้ว ให้ชุดที่มาทีหลังหยุดทำงาน ไม่งั้น id จะซ้ำและปุ่มจะกดไม่ติด
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '6.8';   // ซิงก์อัตโนมัติจาก @version ตอน build
+  const VERSION = '6.9';   // ซิงก์อัตโนมัติจาก @version ตอน build
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.th.user.js';   // build.py ใส่ให้ตามภาษา
 
   // ---------------- ตั้งค่าได้ตรงนี้ ----------------
@@ -23,7 +23,7 @@
     supersededDir: '_Superseded',
     commentDir: 'Comment File',   // ไฟล์ตราประทับที่ผู้ว่าจ้างส่งกลับ อยู่ในโฟลเดอร์เดียวกับเอกสาร
     unsortedDir: '_Unsorted',
-    updatedDir: '_Updated',       // สำเนาไฟล์ที่เพิ่งโหลดใหม่ อยู่ในโฟลเดอร์ของเอกสารนั้นเอง เหมือน Comment File
+    updatedDir: '_Updated',       // สำเนาไฟล์ที่เพิ่งโหลดใหม่ กองรวมโฟลเดอร์เดียวที่ชั้นนอกสุด
     // โฟลเดอร์ที่ห้ามแตะ — ไม่สแกน ไม่จัดใหม่ (เอกสารที่ถูกยกเลิกใน MDR อยู่ในนี้)
     // _Updated เป็นสำเนา ไม่ใช่ตัวจริง ต้องไม่สแกนและไม่จัดใหม่ ไม่งั้นระบบจะนับว่าโหลดแล้ว
     ignoreDirs: ['_Deleted', '_Archive', '_เก็บ', '_Updated']
@@ -136,6 +136,13 @@
     const room = CFG.maxNameLen - sfx.length;
     if (base.length > room) base = base.slice(0, room).trim();
     return base + sfx + '.' + String(ext || 'pdf').toLowerCase();
+  }
+
+  // ชื่อสำเนาใน _Updated — กองรวมโฟลเดอร์เดียว ไฟล์ตราประทับจึงต้องเติมท้ายกันชนกับ PDF ต้นฉบับ
+  function copyName(name, stamp) {
+    if (!stamp) return name;
+    const dot = String(name).lastIndexOf('.');
+    return dot > 0 ? name.slice(0, dot) + ' (Stamped)' + name.slice(dot) : name + ' (Stamped)';
   }
 
   const sanitizeFolder = (s) => String(s).replace(/[\\/:*?"<>|\r\n\t]/g, '-')
@@ -808,8 +815,8 @@
         <label><input type="checkbox" id="edl-rcode" checked> ใส่ R.Code ต่อท้าย Rev ในชื่อไฟล์ (…-T0-AC_…)</label>
         <label><input type="checkbox" id="edl-area" checked> แยกโฟลเดอร์ย่อยตามพื้นที่ (1400 / 0500 / PCC …)</label>
         <label><input type="checkbox" id="edl-inactive"> ค้นรวมเอกสารที่ไม่ Active</label>
-        <label><input type="checkbox" id="edl-copynew" checked> คัดลอกไฟล์ที่โหลดใหม่ไว้ในโฟลเดอร์ย่อย <b>_Updated</b> ด้วย</label>
-        <div class="hint">วางแบบเดียวกับ Comment File คือ <b>_Updated</b> อยู่ในโฟลเดอร์ของเอกสารนั้นเอง · เป็นสำเนา ไฟล์จริงยังอยู่ที่เดิม อ่านแล้วลบทิ้งได้ตลอด</div>
+        <label><input type="checkbox" id="edl-copynew" checked> คัดลอกไฟล์ที่โหลดใหม่ไว้ในโฟลเดอร์ <b>_Updated</b> ด้วย</label>
+        <div class="hint">โฟลเดอร์เดียวที่ชั้นนอกสุด กองรวมกันหมด ไม่แยกวันที่ ไม่มีโฟลเดอร์ย่อย · เป็นสำเนา ไฟล์จริงยังอยู่ที่เดิม อ่านแล้วลบทิ้งได้ตลอด</div>
         <button id="edl-csv">บันทึกรายงาน CSV</button>
       </div>
 
@@ -1214,7 +1221,7 @@
           sup += willSup.length;
           lastReport.push({ ...kr, result: 'จะโหลด', file: name, folder: kParts.join('\\') });
           log(`[${i}/${items.length}] + ${name}  →  ${kParts.join('\\')}`, 'ok');
-          if (copyNew && useFS) log(`      ↳ สำเนาไป ${upParts.concat(k.sub || []).join('\\')}`, 'sk');
+          if (copyNew && useFS) log(`      ↳ สำเนาไป ${CFG.updatedDir}\\${copyName(name, k.stamp)}`, 'sk');
           for (const h of willSup) {
             lastReport.push({ ...kr, rev: h.rev, result: 'จะย้ายเข้า _Superseded', file: h.name,
                               folder: (h.path || kParts).concat(CFG.supersededDir).join('\\') });
@@ -1245,10 +1252,10 @@
                 have.push({ name, rev: String(kr.rev).toUpperCase(), rank: kRank, ext: k.ext, kind,
                             parent: dir, path: kParts, handle: await dir.getFileHandle(name) });
               } catch (e) {}
-              // สำเนาไว้ในโฟลเดอร์ย่อย _Updated ของที่เดียวกับไฟล์จริง — วางแบบเดียวกับ Comment File
+              // สำเนาไว้ใน _Updated ที่ชั้นนอกสุด — กองรวมกันหมด ไม่แยกวันที่ ไม่มีโฟลเดอร์ย่อย
               if (copyNew) {
                 try {
-                  await writeInto(await ensureDir(kParts.concat(CFG.updatedDir)), name, blob);
+                  await writeInto(await ensureDir([CFG.updatedDir]), copyName(name, k.stamp), blob);
                 } catch (e) { log(`      ↳ ทำสำเนาไป ${CFG.updatedDir} ไม่สำเร็จ: ${e.message}`, 'wn'); }
               }
             } else {
