@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GULF ConZoL - Auto Download + Rename + Sort
 // @namespace    gmtp.conzol
-// @version      6.9
+// @version      7.0
 // @description  Download PDFs and native attachments from GULF ConZoL EDMS automatically - names each file and sorts it into the folder ConZoL assigns.
 // @match        https://edms.gulf.co.th/dms/drawing.asp*
 // @match        http://edms.gulf.co.th/dms/drawing.asp*
@@ -22,7 +22,7 @@
   // If a panel already exists the later copy stops here - otherwise ids collide and buttons stop responding
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '6.9';   // kept in sync with @version at build time
+  const VERSION = '7.0';   // kept in sync with @version at build time
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.user.js';   // filled in per language at build time
 
   // ---------------- Settings ----------------
@@ -152,12 +152,9 @@
     return base + sfx + '.' + String(ext || 'pdf').toLowerCase();
   }
 
-  // Name for the copy in _Updated - one flat folder, so a stamped copy needs a suffix to not overwrite the plain PDF
-  function copyName(name, stamp) {
-    if (!stamp) return name;
-    const dot = String(name).lastIndexOf('.');
-    return dot > 0 ? name.slice(0, dot) + ' (Stamped)' + name.slice(dot) : name + ' (Stamped)';
-  }
+  // Where the copy lands inside _Updated - no dated folders
+  // Stamped copies go to _Updated\Comment File, same shape as the real document folder, so they never clash with the plain PDF
+  const copyParts = (stamp) => stamp ? [CFG.updatedDir, CFG.commentDir] : [CFG.updatedDir];
 
   const sanitizeFolder = (s) => String(s).replace(/[\\/:*?"<>|\r\n\t]/g, '-')
     .replace(/\s+/g, ' ').replace(/[. ]+$/g, '').trim().slice(0, 100) || '_Unsorted';
@@ -830,7 +827,7 @@
         <label><input type="checkbox" id="edl-area" checked> Sub-folder per area code (1400 / 0500 / PCC …)</label>
         <label><input type="checkbox" id="edl-inactive"> Include non-active documents in search</label>
         <label><input type="checkbox" id="edl-copynew" checked> Also copy anything newly downloaded into an <b>_Updated</b> folder</label>
-        <div class="hint">One folder at the top level, everything together - no date folders, no sub-folders. These are copies; the real files stay where they are, so delete them once read.</div>
+        <div class="hint">One folder at the top level, no dated sub-folders. Stamped copies go to <b>_Updated\Comment File</b>. These are copies - the real files stay where they are, so delete them once read.</div>
         <button id="edl-csv">Save CSV report</button>
       </div>
 
@@ -1235,7 +1232,7 @@
           sup += willSup.length;
           lastReport.push({ ...kr, result: 'Will download', file: name, folder: kParts.join('\\') });
           log(`[${i}/${items.length}] + ${name}  →  ${kParts.join('\\')}`, 'ok');
-          if (copyNew && useFS) log(`      ↳ copy to ${CFG.updatedDir}\\${copyName(name, k.stamp)}`, 'sk');
+          if (copyNew && useFS) log(`      ↳ copy to ${copyParts(k.stamp).join('\\')}\\${name}`, 'sk');
           for (const h of willSup) {
             lastReport.push({ ...kr, rev: h.rev, result: 'Will move to _Superseded', file: h.name,
                               folder: (h.path || kParts).concat(CFG.supersededDir).join('\\') });
@@ -1266,10 +1263,10 @@
                 have.push({ name, rev: String(kr.rev).toUpperCase(), rank: kRank, ext: k.ext, kind,
                             parent: dir, path: kParts, handle: await dir.getFileHandle(name) });
               } catch (e) {}
-              // Copy into _Updated at the top level - everything together, no date folders, no sub-folders
+              // Copy into _Updated at the top level - no dated folders, stamped ones under Comment File
               if (copyNew) {
                 try {
-                  await writeInto(await ensureDir([CFG.updatedDir]), copyName(name, k.stamp), blob);
+                  await writeInto(await ensureDir(copyParts(k.stamp)), name, blob);
                 } catch (e) { log(`      ↳ could not copy into ${CFG.updatedDir}: ${e.message}`, 'wn'); }
               }
             } else {

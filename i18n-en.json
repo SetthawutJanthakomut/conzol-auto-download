@@ -1276,23 +1276,27 @@
   "updatedDir: '_Updated',       // copies of whatever was just downloaded, all in one folder at the top"
  ],
  [
-  "// ชื่อสำเนาใน _Updated — กองรวมโฟลเดอร์เดียว ไฟล์ตราประทับจึงต้องเติมท้ายกันชนกับ PDF ต้นฉบับ",
-  "// Name for the copy in _Updated - one flat folder, so a stamped copy needs a suffix to not overwrite the plain PDF"
- ],
- [
   "<label><input type=\"checkbox\" id=\"edl-copynew\" checked> คัดลอกไฟล์ที่โหลดใหม่ไว้ในโฟลเดอร์ <b>_Updated</b> ด้วย</label>",
   "<label><input type=\"checkbox\" id=\"edl-copynew\" checked> Also copy anything newly downloaded into an <b>_Updated</b> folder</label>"
  ],
  [
-  "<div class=\"hint\">โฟลเดอร์เดียวที่ชั้นนอกสุด กองรวมกันหมด ไม่แยกวันที่ ไม่มีโฟลเดอร์ย่อย · เป็นสำเนา ไฟล์จริงยังอยู่ที่เดิม อ่านแล้วลบทิ้งได้ตลอด</div>",
-  "<div class=\"hint\">One folder at the top level, everything together - no date folders, no sub-folders. These are copies; the real files stay where they are, so delete them once read.</div>"
+  "// ปลายทางของสำเนาใน _Updated — ไม่แยกวันที่",
+  "// Where the copy lands inside _Updated - no dated folders"
  ],
  [
-  "if (copyNew && useFS) log(`      ↳ สำเนาไป ${CFG.updatedDir}\\\\${copyName(name, k.stamp)}`, 'sk');",
-  "if (copyNew && useFS) log(`      ↳ copy to ${CFG.updatedDir}\\\\${copyName(name, k.stamp)}`, 'sk');"
+  "// ไฟล์ตราประทับแยกเข้า _Updated\\Comment File เหมือนโฟลเดอร์เอกสารจริง จะได้ไม่ชนกับ PDF ต้นฉบับ",
+  "// Stamped copies go to _Updated\\Comment File, same shape as the real document folder, so they never clash with the plain PDF"
  ],
  [
-  "// สำเนาไว้ใน _Updated ที่ชั้นนอกสุด — กองรวมกันหมด ไม่แยกวันที่ ไม่มีโฟลเดอร์ย่อย",
-  "// Copy into _Updated at the top level - everything together, no date folders, no sub-folders"
+  "if (copyNew && useFS) log(`      ↳ สำเนาไป ${copyParts(k.stamp).join('\\\\')}\\\\${name}`, 'sk');",
+  "if (copyNew && useFS) log(`      ↳ copy to ${copyParts(k.stamp).join('\\\\')}\\\\${name}`, 'sk');"
+ ],
+ [
+  "// สำเนาไว้ใน _Updated ที่ชั้นนอกสุด — ไม่แยกวันที่ ตราประทับอยู่ใน Comment File",
+  "// Copy into _Updated at the top level - no dated folders, stamped ones under Comment File"
+ ],
+ [
+  "<div class=\"hint\">โฟลเดอร์เดียวที่ชั้นนอกสุด ไม่แยกวันที่ · ไฟล์ตราประทับอยู่ใน <b>_Updated\\Comment File</b> · เป็นสำเนา ไฟล์จริงยังอยู่ที่เดิม อ่านแล้วลบทิ้งได้ตลอด</div>",
+  "<div class=\"hint\">One folder at the top level, no dated sub-folders. Stamped copies go to <b>_Updated\\Comment File</b>. These are copies - the real files stay where they are, so delete them once read.</div>"
  ]
 ]

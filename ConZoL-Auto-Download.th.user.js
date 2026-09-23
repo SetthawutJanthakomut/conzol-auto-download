@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GULF ConZoL – Auto Download + Rename + Sort (MDR)
 // @namespace    gmtp.marine.jay
-// @version      6.9
+// @version      7.0
 // @description  ดาวน์โหลด PDF และไฟล์แนบ (FILE+) จาก ConZoL ลงโฟลเดอร์ที่เลือกไว้โดยตรง (ไม่ผ่าน Download ของ Chrome) ตั้งชื่อ <DocNo>-<Rev>_<Title>.pdf แยกโฟลเดอร์ตามหมวด ย้าย Rev เก่าเข้า _Superseded และอ่านรายการจากไฟล์ MDR ให้เอง
 // @author       JAY
 // @match        https://edms.gulf.co.th/dms/drawing.asp*
@@ -22,7 +22,7 @@
   // ถ้ามีกล่องอยู่แล้ว ให้ชุดที่มาทีหลังหยุดทำงาน ไม่งั้น id จะซ้ำและปุ่มจะกดไม่ติด
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '6.9';   // ซิงก์อัตโนมัติจาก @version ตอน build
+  const VERSION = '7.0';   // ซิงก์อัตโนมัติจาก @version ตอน build
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.th.user.js';   // build.py ใส่ให้ตามภาษา
 
   // ---------------- ตั้งค่าได้ตรงนี้ ----------------
@@ -135,12 +135,9 @@
     return base + sfx + '.' + String(ext || 'pdf').toLowerCase();
   }
 
-  // ชื่อสำเนาใน _Updated — กองรวมโฟลเดอร์เดียว ไฟล์ตราประทับจึงต้องเติมท้ายกันชนกับ PDF ต้นฉบับ
-  function copyName(name, stamp) {
-    if (!stamp) return name;
-    const dot = String(name).lastIndexOf('.');
-    return dot > 0 ? name.slice(0, dot) + ' (Stamped)' + name.slice(dot) : name + ' (Stamped)';
-  }
+  // ปลายทางของสำเนาใน _Updated — ไม่แยกวันที่
+  // ไฟล์ตราประทับแยกเข้า _Updated\Comment File เหมือนโฟลเดอร์เอกสารจริง จะได้ไม่ชนกับ PDF ต้นฉบับ
+  const copyParts = (stamp) => stamp ? [CFG.updatedDir, CFG.commentDir] : [CFG.updatedDir];
 
   const sanitizeFolder = (s) => String(s).replace(/[\\/:*?"<>|\r\n\t]/g, '-')
     .replace(/\s+/g, ' ').replace(/[. ]+$/g, '').trim().slice(0, 100) || '_Unsorted';
@@ -813,7 +810,7 @@
         <label><input type="checkbox" id="edl-area" checked> แยกโฟลเดอร์ย่อยตามพื้นที่ (1400 / 0500 / PCC …)</label>
         <label><input type="checkbox" id="edl-inactive"> ค้นรวมเอกสารที่ไม่ Active</label>
         <label><input type="checkbox" id="edl-copynew" checked> คัดลอกไฟล์ที่โหลดใหม่ไว้ในโฟลเดอร์ <b>_Updated</b> ด้วย</label>
-        <div class="hint">โฟลเดอร์เดียวที่ชั้นนอกสุด กองรวมกันหมด ไม่แยกวันที่ ไม่มีโฟลเดอร์ย่อย · เป็นสำเนา ไฟล์จริงยังอยู่ที่เดิม อ่านแล้วลบทิ้งได้ตลอด</div>
+        <div class="hint">โฟลเดอร์เดียวที่ชั้นนอกสุด ไม่แยกวันที่ · ไฟล์ตราประทับอยู่ใน <b>_Updated\Comment File</b> · เป็นสำเนา ไฟล์จริงยังอยู่ที่เดิม อ่านแล้วลบทิ้งได้ตลอด</div>
         <button id="edl-csv">บันทึกรายงาน CSV</button>
       </div>
 
@@ -1218,7 +1215,7 @@
           sup += willSup.length;
           lastReport.push({ ...kr, result: 'จะโหลด', file: name, folder: kParts.join('\\') });
           log(`[${i}/${items.length}] + ${name}  →  ${kParts.join('\\')}`, 'ok');
-          if (copyNew && useFS) log(`      ↳ สำเนาไป ${CFG.updatedDir}\\${copyName(name, k.stamp)}`, 'sk');
+          if (copyNew && useFS) log(`      ↳ สำเนาไป ${copyParts(k.stamp).join('\\')}\\${name}`, 'sk');
           for (const h of willSup) {
             lastReport.push({ ...kr, rev: h.rev, result: 'จะย้ายเข้า _Superseded', file: h.name,
                               folder: (h.path || kParts).concat(CFG.supersededDir).join('\\') });
@@ -1249,10 +1246,10 @@
                 have.push({ name, rev: String(kr.rev).toUpperCase(), rank: kRank, ext: k.ext, kind,
                             parent: dir, path: kParts, handle: await dir.getFileHandle(name) });
               } catch (e) {}
-              // สำเนาไว้ใน _Updated ที่ชั้นนอกสุด — กองรวมกันหมด ไม่แยกวันที่ ไม่มีโฟลเดอร์ย่อย
+              // สำเนาไว้ใน _Updated ที่ชั้นนอกสุด — ไม่แยกวันที่ ตราประทับอยู่ใน Comment File
               if (copyNew) {
                 try {
-                  await writeInto(await ensureDir([CFG.updatedDir]), copyName(name, k.stamp), blob);
+                  await writeInto(await ensureDir(copyParts(k.stamp)), name, blob);
                 } catch (e) { log(`      ↳ ทำสำเนาไป ${CFG.updatedDir} ไม่สำเร็จ: ${e.message}`, 'wn'); }
               }
             } else {
