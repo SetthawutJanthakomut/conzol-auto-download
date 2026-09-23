@@ -6,7 +6,7 @@
   // If a panel already exists the later copy stops here - otherwise ids collide and buttons stop responding
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '6.5';   // kept in sync with @version at build time
+  const VERSION = '6.7';   // kept in sync with @version at build time
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.user.js';   // filled in per language at build time
 
   // ---------------- Settings ----------------
@@ -21,8 +21,10 @@
     supersededDir: '_Superseded',
     commentDir: 'Comment File',   // the stamped copies the owner returns, kept with the document itself
     unsortedDir: '_Unsorted',
+    updatedDir: '_Updated',       // copies of what was just downloaded, by day, so it is clear what came in
     // Folders never touched - not scanned, not re-sorted (cancelled MDR documents live here)
-    ignoreDirs: ['_Deleted', '_Archive', '_Cancelled']
+    // _Updated holds copies, not the real files - never scan or re-sort it, or they count as already downloaded
+    ignoreDirs: ['_Deleted', '_Archive', '_Cancelled', '_Updated']
   };
 
   // Optional labels for area codes - add as you learn them (unlisted codes use the bare code)
@@ -379,7 +381,11 @@
   }
 
   async function searchPage(extra) {
-    const body = new URLSearchParams(Object.assign(formBase(), extra || {}));
+    const o = Object.assign(formBase(), extra || {});
+    // ConZoL only changes page when pagechange=1 is sent as well - otherwise it returns page 1 again
+    // (so a result over 100 rows - MARINE has 156 - is no longer silently cut short)
+    if (o.page && String(o.page) !== '1') o.pagechange = '1';
+    const body = new URLSearchParams(o);
     const res = await fetch('drawing.asp', {
       method: 'POST', credentials: 'same-origin',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body
@@ -800,6 +806,8 @@
         <label><input type="checkbox" id="edl-rcode" checked> Add R.Code after the revision in the file name (…-T0-AC_…)</label>
         <label><input type="checkbox" id="edl-area" checked> Sub-folder per area code (1400 / 0500 / PCC …)</label>
         <label><input type="checkbox" id="edl-inactive"> Include non-active documents in search</label>
+        <label><input type="checkbox" id="edl-copynew" checked> Also copy what was downloaded into <b>_Updated\date</b></label>
+        <div class="hint">These are copies - the real files stay in their document folders. Use it to see what arrived on which day; safe to delete any time.</div>
         <button id="edl-csv">Save CSV report</button>
       </div>
 
@@ -1106,6 +1114,9 @@
     const wantPdf = el('edl-getpdf').checked;
     const wantFile = el('edl-getfile').checked;
     const wantStamp = el('edl-getstamp').checked;
+    const copyNew = el('edl-copynew').checked;
+    // This run's copy folder - one date for the whole run, so a long run does not split across midnight
+    const upParts = [CFG.updatedDir, today()];
     const wantRCode = el('edl-rcode').checked;
     const revCache = new Map();   // fileid -> revision history, in case a document comes round twice
     const useFS = !!rootDir;
@@ -1203,6 +1214,7 @@
           sup += willSup.length;
           lastReport.push({ ...kr, result: 'Will download', file: name, folder: kParts.join('\\') });
           log(`[${i}/${items.length}] + ${name}  →  ${kParts.join('\\')}`, 'ok');
+          if (copyNew && useFS) log(`      ↳ copy to ${upParts.concat(k.sub || []).join('\\')}`, 'sk');
           for (const h of willSup) {
             lastReport.push({ ...kr, rev: h.rev, result: 'Will move to _Superseded', file: h.name,
                               folder: (h.path || kParts).concat(CFG.supersededDir).join('\\') });
@@ -1233,6 +1245,12 @@
                 have.push({ name, rev: String(kr.rev).toUpperCase(), rank: kRank, ext: k.ext, kind,
                             parent: dir, path: kParts, handle: await dir.getFileHandle(name) });
               } catch (e) {}
+              // Also copy into today's folder (stamped copies keep their own sub-folder so names cannot collide)
+              if (copyNew) {
+                try {
+                  await writeInto(await ensureDir(upParts.concat(k.sub || [])), name, blob);
+                } catch (e) { log(`      ↳ could not copy into ${CFG.updatedDir}: ${e.message}`, 'wn'); }
+              }
             } else {
               browserDownload(name, blob);
             }
@@ -1371,7 +1389,7 @@
     d.textContent = msg || (last ? 'Last automatic run: ' + last : 'Has not run on its own yet');
   }
   // Remember the checkboxes, so a new page or the next morning keeps the same settings
-  ['edl-rcode', 'edl-skip', 'edl-sup', 'edl-area', 'edl-inactive', 'edl-getpdf', 'edl-getfile', 'edl-getstamp',
+  ['edl-rcode', 'edl-skip', 'edl-sup', 'edl-area', 'edl-inactive', 'edl-getpdf', 'edl-getfile', 'edl-getstamp', 'edl-copynew',
    'edl-sh-mdr', 'edl-sh-rev', 'edl-sh-folder', 'edl-sh-conzol', 'edl-sh-cmp'].forEach((id) => {
     const c = el(id);
     if (!c) return;

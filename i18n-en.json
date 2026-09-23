@@ -1254,5 +1254,45 @@
  [
   "log('ชนิดไฟล์ที่จะโหลด: ' + (kinds.join(' · ') || 'ยังไม่ได้เลือก'), kinds.length ? 'sk' : 'er');",
   "log('File types to download: ' + (kinds.join(' · ') || 'none selected'), kinds.length ? 'sk' : 'er');"
+ ],
+ [
+  "// ConZoL จะยอมเปลี่ยนหน้าก็ต่อเมื่อส่ง pagechange=1 มาด้วย ไม่งั้นคืนหน้า 1 ซ้ำ",
+  "// ConZoL only changes page when pagechange=1 is sent as well - otherwise it returns page 1 again"
+ ],
+ [
+  "// (ผลค้นเกิน 100 รายการ เช่น discipline MARINE 156 ตัว จะได้ไม่หายไปเงียบ ๆ)",
+  "// (so a result over 100 rows - MARINE has 156 - is no longer silently cut short)"
+ ],
+ [
+  "updatedDir: '_Updated',       // สำเนาไฟล์ที่เพิ่งโหลดใหม่ แยกตามวัน จะได้รู้ว่าวันนี้มีอะไรเข้ามา",
+  "updatedDir: '_Updated',       // copies of what was just downloaded, by day, so it is clear what came in"
+ ],
+ [
+  "// _Updated เป็นสำเนา ไม่ใช่ตัวจริง ต้องไม่สแกนและไม่จัดใหม่ ไม่งั้นระบบจะนับว่าโหลดแล้ว",
+  "// _Updated holds copies, not the real files - never scan or re-sort it, or they count as already downloaded"
+ ],
+ [
+  "<label><input type=\"checkbox\" id=\"edl-copynew\" checked> คัดลอกไฟล์ที่โหลดใหม่ไว้ใน <b>_Updated\\วันที่</b> ด้วย</label>",
+  "<label><input type=\"checkbox\" id=\"edl-copynew\" checked> Also copy what was downloaded into <b>_Updated\\date</b></label>"
+ ],
+ [
+  "<div class=\"hint\">เป็นสำเนา ไฟล์จริงยังอยู่ในโฟลเดอร์เอกสารตามเดิม · ใช้ดูว่าวันไหนมีอะไรเข้ามาใหม่บ้าง ลบทิ้งได้ตลอด</div>",
+  "<div class=\"hint\">These are copies - the real files stay in their document folders. Use it to see what arrived on which day; safe to delete any time.</div>"
+ ],
+ [
+  "// โฟลเดอร์สำเนาของรอบนี้ — ใช้วันที่เดียวตลอดการทำงาน ไม่ให้ข้ามวันตอนรันยาว ๆ",
+  "// This run's copy folder - one date for the whole run, so a long run does not split across midnight"
+ ],
+ [
+  "if (copyNew && useFS) log(`      ↳ สำเนาไป ${upParts.concat(k.sub || []).join('\\\\')}`, 'sk');",
+  "if (copyNew && useFS) log(`      ↳ copy to ${upParts.concat(k.sub || []).join('\\\\')}`, 'sk');"
+ ],
+ [
+  "// สำเนาไว้ในโฟลเดอร์ของวันนี้ด้วย (ตราประทับแยกเป็นโฟลเดอร์ย่อยเหมือนเดิม กันชื่อชนกัน)",
+  "// Also copy into today's folder (stamped copies keep their own sub-folder so names cannot collide)"
+ ],
+ [
+  "} catch (e) { log(`      ↳ ทำสำเนาไป ${CFG.updatedDir} ไม่สำเร็จ: ${e.message}`, 'wn'); }",
+  "} catch (e) { log(`      ↳ could not copy into ${CFG.updatedDir}: ${e.message}`, 'wn'); }"
  ]
 ]

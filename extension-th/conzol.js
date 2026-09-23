@@ -8,7 +8,7 @@
   // ถ้ามีกล่องอยู่แล้ว ให้ชุดที่มาทีหลังหยุดทำงาน ไม่งั้น id จะซ้ำและปุ่มจะกดไม่ติด
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '6.5';   // ซิงก์อัตโนมัติจาก @version ตอน build
+  const VERSION = '6.7';   // ซิงก์อัตโนมัติจาก @version ตอน build
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.th.user.js';   // build.py ใส่ให้ตามภาษา
 
   // ---------------- ตั้งค่าได้ตรงนี้ ----------------
@@ -23,8 +23,10 @@
     supersededDir: '_Superseded',
     commentDir: 'Comment File',   // ไฟล์ตราประทับที่ผู้ว่าจ้างส่งกลับ อยู่ในโฟลเดอร์เดียวกับเอกสาร
     unsortedDir: '_Unsorted',
+    updatedDir: '_Updated',       // สำเนาไฟล์ที่เพิ่งโหลดใหม่ แยกตามวัน จะได้รู้ว่าวันนี้มีอะไรเข้ามา
     // โฟลเดอร์ที่ห้ามแตะ — ไม่สแกน ไม่จัดใหม่ (เอกสารที่ถูกยกเลิกใน MDR อยู่ในนี้)
-    ignoreDirs: ['_Deleted', '_Archive', '_เก็บ']
+    // _Updated เป็นสำเนา ไม่ใช่ตัวจริง ต้องไม่สแกนและไม่จัดใหม่ ไม่งั้นระบบจะนับว่าโหลดแล้ว
+    ignoreDirs: ['_Deleted', '_Archive', '_เก็บ', '_Updated']
   };
 
   // ชื่อกำกับเลขพื้นที่ — เพิ่มได้เรื่อย ๆ ตามที่รู้ (เลขที่ไม่มีในนี้จะใช้เลขเปล่า)
@@ -381,7 +383,11 @@
   }
 
   async function searchPage(extra) {
-    const body = new URLSearchParams(Object.assign(formBase(), extra || {}));
+    const o = Object.assign(formBase(), extra || {});
+    // ConZoL จะยอมเปลี่ยนหน้าก็ต่อเมื่อส่ง pagechange=1 มาด้วย ไม่งั้นคืนหน้า 1 ซ้ำ
+    // (ผลค้นเกิน 100 รายการ เช่น discipline MARINE 156 ตัว จะได้ไม่หายไปเงียบ ๆ)
+    if (o.page && String(o.page) !== '1') o.pagechange = '1';
+    const body = new URLSearchParams(o);
     const res = await fetch('drawing.asp', {
       method: 'POST', credentials: 'same-origin',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body
@@ -802,6 +808,8 @@
         <label><input type="checkbox" id="edl-rcode" checked> ใส่ R.Code ต่อท้าย Rev ในชื่อไฟล์ (…-T0-AC_…)</label>
         <label><input type="checkbox" id="edl-area" checked> แยกโฟลเดอร์ย่อยตามพื้นที่ (1400 / 0500 / PCC …)</label>
         <label><input type="checkbox" id="edl-inactive"> ค้นรวมเอกสารที่ไม่ Active</label>
+        <label><input type="checkbox" id="edl-copynew" checked> คัดลอกไฟล์ที่โหลดใหม่ไว้ใน <b>_Updated\วันที่</b> ด้วย</label>
+        <div class="hint">เป็นสำเนา ไฟล์จริงยังอยู่ในโฟลเดอร์เอกสารตามเดิม · ใช้ดูว่าวันไหนมีอะไรเข้ามาใหม่บ้าง ลบทิ้งได้ตลอด</div>
         <button id="edl-csv">บันทึกรายงาน CSV</button>
       </div>
 
@@ -1108,6 +1116,9 @@
     const wantPdf = el('edl-getpdf').checked;
     const wantFile = el('edl-getfile').checked;
     const wantStamp = el('edl-getstamp').checked;
+    const copyNew = el('edl-copynew').checked;
+    // โฟลเดอร์สำเนาของรอบนี้ — ใช้วันที่เดียวตลอดการทำงาน ไม่ให้ข้ามวันตอนรันยาว ๆ
+    const upParts = [CFG.updatedDir, today()];
     const wantRCode = el('edl-rcode').checked;
     const revCache = new Map();   // fileid -> ประวัติ Rev เผื่อเอกสารเดิมโผล่ซ้ำ
     const useFS = !!rootDir;
@@ -1205,6 +1216,7 @@
           sup += willSup.length;
           lastReport.push({ ...kr, result: 'จะโหลด', file: name, folder: kParts.join('\\') });
           log(`[${i}/${items.length}] + ${name}  →  ${kParts.join('\\')}`, 'ok');
+          if (copyNew && useFS) log(`      ↳ สำเนาไป ${upParts.concat(k.sub || []).join('\\')}`, 'sk');
           for (const h of willSup) {
             lastReport.push({ ...kr, rev: h.rev, result: 'จะย้ายเข้า _Superseded', file: h.name,
                               folder: (h.path || kParts).concat(CFG.supersededDir).join('\\') });
@@ -1235,6 +1247,12 @@
                 have.push({ name, rev: String(kr.rev).toUpperCase(), rank: kRank, ext: k.ext, kind,
                             parent: dir, path: kParts, handle: await dir.getFileHandle(name) });
               } catch (e) {}
+              // สำเนาไว้ในโฟลเดอร์ของวันนี้ด้วย (ตราประทับแยกเป็นโฟลเดอร์ย่อยเหมือนเดิม กันชื่อชนกัน)
+              if (copyNew) {
+                try {
+                  await writeInto(await ensureDir(upParts.concat(k.sub || [])), name, blob);
+                } catch (e) { log(`      ↳ ทำสำเนาไป ${CFG.updatedDir} ไม่สำเร็จ: ${e.message}`, 'wn'); }
+              }
             } else {
               browserDownload(name, blob);
             }
@@ -1373,7 +1391,7 @@
     d.textContent = msg || (last ? 'รันอัตโนมัติล่าสุด: ' + last : 'ยังไม่เคยรันอัตโนมัติ');
   }
   // จำค่าช่องติ๊กไว้ เปิดหน้าใหม่หรือวันรุ่งขึ้นก็ยังเป็นค่าที่ตั้งไว้
-  ['edl-rcode', 'edl-skip', 'edl-sup', 'edl-area', 'edl-inactive', 'edl-getpdf', 'edl-getfile', 'edl-getstamp',
+  ['edl-rcode', 'edl-skip', 'edl-sup', 'edl-area', 'edl-inactive', 'edl-getpdf', 'edl-getfile', 'edl-getstamp', 'edl-copynew',
    'edl-sh-mdr', 'edl-sh-rev', 'edl-sh-folder', 'edl-sh-conzol', 'edl-sh-cmp'].forEach((id) => {
     const c = el(id);
     if (!c) return;
