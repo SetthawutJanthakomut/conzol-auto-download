@@ -6,7 +6,7 @@
   // If a panel already exists the later copy stops here - otherwise ids collide and buttons stop responding
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '6.7';   // kept in sync with @version at build time
+  const VERSION = '6.8';   // kept in sync with @version at build time
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.user.js';   // filled in per language at build time
 
   // ---------------- Settings ----------------
@@ -21,7 +21,7 @@
     supersededDir: '_Superseded',
     commentDir: 'Comment File',   // the stamped copies the owner returns, kept with the document itself
     unsortedDir: '_Unsorted',
-    updatedDir: '_Updated',       // copies of what was just downloaded, by day, so it is clear what came in
+    updatedDir: '_Updated',       // a copy of whatever was just downloaded, in the document's own folder, like Comment File
     // Folders never touched - not scanned, not re-sorted (cancelled MDR documents live here)
     // _Updated holds copies, not the real files - never scan or re-sort it, or they count as already downloaded
     ignoreDirs: ['_Deleted', '_Archive', '_Cancelled', '_Updated']
@@ -806,8 +806,8 @@
         <label><input type="checkbox" id="edl-rcode" checked> Add R.Code after the revision in the file name (…-T0-AC_…)</label>
         <label><input type="checkbox" id="edl-area" checked> Sub-folder per area code (1400 / 0500 / PCC …)</label>
         <label><input type="checkbox" id="edl-inactive"> Include non-active documents in search</label>
-        <label><input type="checkbox" id="edl-copynew" checked> Also copy what was downloaded into <b>_Updated\date</b></label>
-        <div class="hint">These are copies - the real files stay in their document folders. Use it to see what arrived on which day; safe to delete any time.</div>
+        <label><input type="checkbox" id="edl-copynew" checked> Also keep a copy of anything newly downloaded in an <b>_Updated</b> sub-folder</label>
+        <div class="hint">Placed the same way as Comment File: <b>_Updated</b> sits inside the document's own folder. It is a copy - the real file stays where it was, so delete these once you have read them.</div>
         <button id="edl-csv">Save CSV report</button>
       </div>
 
@@ -1115,8 +1115,6 @@
     const wantFile = el('edl-getfile').checked;
     const wantStamp = el('edl-getstamp').checked;
     const copyNew = el('edl-copynew').checked;
-    // This run's copy folder - one date for the whole run, so a long run does not split across midnight
-    const upParts = [CFG.updatedDir, today()];
     const wantRCode = el('edl-rcode').checked;
     const revCache = new Map();   // fileid -> revision history, in case a document comes round twice
     const useFS = !!rootDir;
@@ -1245,10 +1243,10 @@
                 have.push({ name, rev: String(kr.rev).toUpperCase(), rank: kRank, ext: k.ext, kind,
                             parent: dir, path: kParts, handle: await dir.getFileHandle(name) });
               } catch (e) {}
-              // Also copy into today's folder (stamped copies keep their own sub-folder so names cannot collide)
+              // Copy into an _Updated sub-folder next to the real file - placed the same way as Comment File
               if (copyNew) {
                 try {
-                  await writeInto(await ensureDir(upParts.concat(k.sub || [])), name, blob);
+                  await writeInto(await ensureDir(kParts.concat(CFG.updatedDir)), name, blob);
                 } catch (e) { log(`      ↳ could not copy into ${CFG.updatedDir}: ${e.message}`, 'wn'); }
               }
             } else {

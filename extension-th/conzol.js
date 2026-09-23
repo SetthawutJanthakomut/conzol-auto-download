@@ -8,7 +8,7 @@
   // ถ้ามีกล่องอยู่แล้ว ให้ชุดที่มาทีหลังหยุดทำงาน ไม่งั้น id จะซ้ำและปุ่มจะกดไม่ติด
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '6.7';   // ซิงก์อัตโนมัติจาก @version ตอน build
+  const VERSION = '6.8';   // ซิงก์อัตโนมัติจาก @version ตอน build
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.th.user.js';   // build.py ใส่ให้ตามภาษา
 
   // ---------------- ตั้งค่าได้ตรงนี้ ----------------
@@ -23,7 +23,7 @@
     supersededDir: '_Superseded',
     commentDir: 'Comment File',   // ไฟล์ตราประทับที่ผู้ว่าจ้างส่งกลับ อยู่ในโฟลเดอร์เดียวกับเอกสาร
     unsortedDir: '_Unsorted',
-    updatedDir: '_Updated',       // สำเนาไฟล์ที่เพิ่งโหลดใหม่ แยกตามวัน จะได้รู้ว่าวันนี้มีอะไรเข้ามา
+    updatedDir: '_Updated',       // สำเนาไฟล์ที่เพิ่งโหลดใหม่ อยู่ในโฟลเดอร์ของเอกสารนั้นเอง เหมือน Comment File
     // โฟลเดอร์ที่ห้ามแตะ — ไม่สแกน ไม่จัดใหม่ (เอกสารที่ถูกยกเลิกใน MDR อยู่ในนี้)
     // _Updated เป็นสำเนา ไม่ใช่ตัวจริง ต้องไม่สแกนและไม่จัดใหม่ ไม่งั้นระบบจะนับว่าโหลดแล้ว
     ignoreDirs: ['_Deleted', '_Archive', '_เก็บ', '_Updated']
@@ -808,8 +808,8 @@
         <label><input type="checkbox" id="edl-rcode" checked> ใส่ R.Code ต่อท้าย Rev ในชื่อไฟล์ (…-T0-AC_…)</label>
         <label><input type="checkbox" id="edl-area" checked> แยกโฟลเดอร์ย่อยตามพื้นที่ (1400 / 0500 / PCC …)</label>
         <label><input type="checkbox" id="edl-inactive"> ค้นรวมเอกสารที่ไม่ Active</label>
-        <label><input type="checkbox" id="edl-copynew" checked> คัดลอกไฟล์ที่โหลดใหม่ไว้ใน <b>_Updated\วันที่</b> ด้วย</label>
-        <div class="hint">เป็นสำเนา ไฟล์จริงยังอยู่ในโฟลเดอร์เอกสารตามเดิม · ใช้ดูว่าวันไหนมีอะไรเข้ามาใหม่บ้าง ลบทิ้งได้ตลอด</div>
+        <label><input type="checkbox" id="edl-copynew" checked> คัดลอกไฟล์ที่โหลดใหม่ไว้ในโฟลเดอร์ย่อย <b>_Updated</b> ด้วย</label>
+        <div class="hint">วางแบบเดียวกับ Comment File คือ <b>_Updated</b> อยู่ในโฟลเดอร์ของเอกสารนั้นเอง · เป็นสำเนา ไฟล์จริงยังอยู่ที่เดิม อ่านแล้วลบทิ้งได้ตลอด</div>
         <button id="edl-csv">บันทึกรายงาน CSV</button>
       </div>
 
@@ -1117,8 +1117,6 @@
     const wantFile = el('edl-getfile').checked;
     const wantStamp = el('edl-getstamp').checked;
     const copyNew = el('edl-copynew').checked;
-    // โฟลเดอร์สำเนาของรอบนี้ — ใช้วันที่เดียวตลอดการทำงาน ไม่ให้ข้ามวันตอนรันยาว ๆ
-    const upParts = [CFG.updatedDir, today()];
     const wantRCode = el('edl-rcode').checked;
     const revCache = new Map();   // fileid -> ประวัติ Rev เผื่อเอกสารเดิมโผล่ซ้ำ
     const useFS = !!rootDir;
@@ -1247,10 +1245,10 @@
                 have.push({ name, rev: String(kr.rev).toUpperCase(), rank: kRank, ext: k.ext, kind,
                             parent: dir, path: kParts, handle: await dir.getFileHandle(name) });
               } catch (e) {}
-              // สำเนาไว้ในโฟลเดอร์ของวันนี้ด้วย (ตราประทับแยกเป็นโฟลเดอร์ย่อยเหมือนเดิม กันชื่อชนกัน)
+              // สำเนาไว้ในโฟลเดอร์ย่อย _Updated ของที่เดียวกับไฟล์จริง — วางแบบเดียวกับ Comment File
               if (copyNew) {
                 try {
-                  await writeInto(await ensureDir(upParts.concat(k.sub || [])), name, blob);
+                  await writeInto(await ensureDir(kParts.concat(CFG.updatedDir)), name, blob);
                 } catch (e) { log(`      ↳ ทำสำเนาไป ${CFG.updatedDir} ไม่สำเร็จ: ${e.message}`, 'wn'); }
               }
             } else {

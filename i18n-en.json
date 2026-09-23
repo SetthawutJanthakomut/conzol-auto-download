@@ -1264,35 +1264,31 @@
   "// (so a result over 100 rows - MARINE has 156 - is no longer silently cut short)"
  ],
  [
-  "updatedDir: '_Updated',       // สำเนาไฟล์ที่เพิ่งโหลดใหม่ แยกตามวัน จะได้รู้ว่าวันนี้มีอะไรเข้ามา",
-  "updatedDir: '_Updated',       // copies of what was just downloaded, by day, so it is clear what came in"
- ],
- [
   "// _Updated เป็นสำเนา ไม่ใช่ตัวจริง ต้องไม่สแกนและไม่จัดใหม่ ไม่งั้นระบบจะนับว่าโหลดแล้ว",
   "// _Updated holds copies, not the real files - never scan or re-sort it, or they count as already downloaded"
- ],
- [
-  "<label><input type=\"checkbox\" id=\"edl-copynew\" checked> คัดลอกไฟล์ที่โหลดใหม่ไว้ใน <b>_Updated\\วันที่</b> ด้วย</label>",
-  "<label><input type=\"checkbox\" id=\"edl-copynew\" checked> Also copy what was downloaded into <b>_Updated\\date</b></label>"
- ],
- [
-  "<div class=\"hint\">เป็นสำเนา ไฟล์จริงยังอยู่ในโฟลเดอร์เอกสารตามเดิม · ใช้ดูว่าวันไหนมีอะไรเข้ามาใหม่บ้าง ลบทิ้งได้ตลอด</div>",
-  "<div class=\"hint\">These are copies - the real files stay in their document folders. Use it to see what arrived on which day; safe to delete any time.</div>"
- ],
- [
-  "// โฟลเดอร์สำเนาของรอบนี้ — ใช้วันที่เดียวตลอดการทำงาน ไม่ให้ข้ามวันตอนรันยาว ๆ",
-  "// This run's copy folder - one date for the whole run, so a long run does not split across midnight"
  ],
  [
   "if (copyNew && useFS) log(`      ↳ สำเนาไป ${upParts.concat(k.sub || []).join('\\\\')}`, 'sk');",
   "if (copyNew && useFS) log(`      ↳ copy to ${upParts.concat(k.sub || []).join('\\\\')}`, 'sk');"
  ],
  [
-  "// สำเนาไว้ในโฟลเดอร์ของวันนี้ด้วย (ตราประทับแยกเป็นโฟลเดอร์ย่อยเหมือนเดิม กันชื่อชนกัน)",
-  "// Also copy into today's folder (stamped copies keep their own sub-folder so names cannot collide)"
- ],
- [
   "} catch (e) { log(`      ↳ ทำสำเนาไป ${CFG.updatedDir} ไม่สำเร็จ: ${e.message}`, 'wn'); }",
   "} catch (e) { log(`      ↳ could not copy into ${CFG.updatedDir}: ${e.message}`, 'wn'); }"
+ ],
+ [
+  "updatedDir: '_Updated',       // สำเนาไฟล์ที่เพิ่งโหลดใหม่ อยู่ในโฟลเดอร์ของเอกสารนั้นเอง เหมือน Comment File",
+  "updatedDir: '_Updated',       // a copy of whatever was just downloaded, in the document's own folder, like Comment File"
+ ],
+ [
+  "<label><input type=\"checkbox\" id=\"edl-copynew\" checked> คัดลอกไฟล์ที่โหลดใหม่ไว้ในโฟลเดอร์ย่อย <b>_Updated</b> ด้วย</label>",
+  "<label><input type=\"checkbox\" id=\"edl-copynew\" checked> Also keep a copy of anything newly downloaded in an <b>_Updated</b> sub-folder</label>"
+ ],
+ [
+  "<div class=\"hint\">วางแบบเดียวกับ Comment File คือ <b>_Updated</b> อยู่ในโฟลเดอร์ของเอกสารนั้นเอง · เป็นสำเนา ไฟล์จริงยังอยู่ที่เดิม อ่านแล้วลบทิ้งได้ตลอด</div>",
+  "<div class=\"hint\">Placed the same way as Comment File: <b>_Updated</b> sits inside the document's own folder. It is a copy - the real file stays where it was, so delete these once you have read them.</div>"
+ ],
+ [
+  "// สำเนาไว้ในโฟลเดอร์ย่อย _Updated ของที่เดียวกับไฟล์จริง — วางแบบเดียวกับ Comment File",
+  "// Copy into an _Updated sub-folder next to the real file - placed the same way as Comment File"
  ]
 ]
