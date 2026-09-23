@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GULF ConZoL – Auto Download + Rename + Sort (MDR)
 // @namespace    gmtp.marine.jay
-// @version      7.0
+// @version      7.1
 // @description  ดาวน์โหลด PDF และไฟล์แนบ (FILE+) จาก ConZoL ลงโฟลเดอร์ที่เลือกไว้โดยตรง (ไม่ผ่าน Download ของ Chrome) ตั้งชื่อ <DocNo>-<Rev>_<Title>.pdf แยกโฟลเดอร์ตามหมวด ย้าย Rev เก่าเข้า _Superseded และอ่านรายการจากไฟล์ MDR ให้เอง
 // @author       JAY
 // @match        https://edms.gulf.co.th/dms/drawing.asp*
@@ -22,7 +22,7 @@
   // ถ้ามีกล่องอยู่แล้ว ให้ชุดที่มาทีหลังหยุดทำงาน ไม่งั้น id จะซ้ำและปุ่มจะกดไม่ติด
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '7.0';   // ซิงก์อัตโนมัติจาก @version ตอน build
+  const VERSION = '7.1';   // ซิงก์อัตโนมัติจาก @version ตอน build
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.th.user.js';   // build.py ใส่ให้ตามภาษา
 
   // ---------------- ตั้งค่าได้ตรงนี้ ----------------
@@ -38,6 +38,8 @@
     commentDir: 'Comment File',   // ไฟล์ตราประทับที่ผู้ว่าจ้างส่งกลับ อยู่ในโฟลเดอร์เดียวกับเอกสาร
     unsortedDir: '_Unsorted',
     updatedDir: '_Updated',       // สำเนาไฟล์ที่เพิ่งโหลดใหม่ กองรวมโฟลเดอร์เดียวที่ชั้นนอกสุด
+    newDir: 'New',                // เอกสารที่ยังไม่เคยมีไฟล์ในโฟลเดอร์
+    revisedDir: 'Revised',        // เอกสารเดิมที่ ConZoL ออก Rev ใหม่
     // โฟลเดอร์ที่ห้ามแตะ — ไม่สแกน ไม่จัดใหม่ (เอกสารที่ถูกยกเลิกใน MDR อยู่ในนี้)
     // _Updated เป็นสำเนา ไม่ใช่ตัวจริง ต้องไม่สแกนและไม่จัดใหม่ ไม่งั้นระบบจะนับว่าโหลดแล้ว
     ignoreDirs: ['_Deleted', '_Archive', '_เก็บ', '_Updated']
@@ -135,9 +137,12 @@
     return base + sfx + '.' + String(ext || 'pdf').toLowerCase();
   }
 
-  // ปลายทางของสำเนาใน _Updated — ไม่แยกวันที่
-  // ไฟล์ตราประทับแยกเข้า _Updated\Comment File เหมือนโฟลเดอร์เอกสารจริง จะได้ไม่ชนกับ PDF ต้นฉบับ
-  const copyParts = (stamp) => stamp ? [CFG.updatedDir, CFG.commentDir] : [CFG.updatedDir];
+  // ปลายทางของสำเนาใน _Updated — ไม่แยกวันที่ แต่แยกว่าเป็นเอกสารใหม่หรือ Rev ใหม่
+  //   New      = ยังไม่เคยมีไฟล์ของเอกสารนี้ในโฟลเดอร์เลย (เพิ่งขึ้น ConZoL หรือยังไม่เคยโหลด)
+  //   Revised  = มีอยู่แล้ว แต่ ConZoL ออก Rev ใหม่
+  // ไฟล์ตราประทับแยกเข้า Comment File เหมือนโฟลเดอร์เอกสารจริง จะได้ไม่ชนกับ PDF ต้นฉบับ
+  const copyParts = (stamp, isNew) => [CFG.updatedDir, isNew ? CFG.newDir : CFG.revisedDir]
+    .concat(stamp ? [CFG.commentDir] : []);
 
   const sanitizeFolder = (s) => String(s).replace(/[\\/:*?"<>|\r\n\t]/g, '-')
     .replace(/\s+/g, ' ').replace(/[. ]+$/g, '').trim().slice(0, 100) || '_Unsorted';
@@ -810,7 +815,7 @@
         <label><input type="checkbox" id="edl-area" checked> แยกโฟลเดอร์ย่อยตามพื้นที่ (1400 / 0500 / PCC …)</label>
         <label><input type="checkbox" id="edl-inactive"> ค้นรวมเอกสารที่ไม่ Active</label>
         <label><input type="checkbox" id="edl-copynew" checked> คัดลอกไฟล์ที่โหลดใหม่ไว้ในโฟลเดอร์ <b>_Updated</b> ด้วย</label>
-        <div class="hint">โฟลเดอร์เดียวที่ชั้นนอกสุด ไม่แยกวันที่ · ไฟล์ตราประทับอยู่ใน <b>_Updated\Comment File</b> · เป็นสำเนา ไฟล์จริงยังอยู่ที่เดิม อ่านแล้วลบทิ้งได้ตลอด</div>
+        <div class="hint">ไม่แยกวันที่ แยกเป็น <b>New</b> (ยังไม่เคยมีไฟล์ในโฟลเดอร์ / เพิ่งขึ้น ConZoL) กับ <b>Revised</b> (Rev ใหม่ของเอกสารเดิม) · ตราประทับอยู่ใน <b>Comment File</b> ของแต่ละอัน · เป็นสำเนา ไฟล์จริงยังอยู่ที่เดิม อ่านแล้วลบทิ้งได้ตลอด</div>
         <button id="edl-csv">บันทึกรายงาน CSV</button>
       </div>
 
@@ -1135,6 +1140,8 @@
       const rank = rm ? revRank(rm[1], rm[2]) : -1;
       if (!existing.has(doc)) existing.set(doc, []);
       const have = existing.get(doc);
+      // ดูก่อนเริ่มโหลด: ยังไม่มีไฟล์ของเอกสารนี้เลย = ของใหม่ (have จะโตขึ้นระหว่างรอบ)
+      const isNewDoc = have.length === 0;
       const parts = targetPath(doc, r.groupCode, r.groupName);
 
       // R.Code กับไฟล์ตราประทับอยู่ในตารางประวัติ ไม่ได้อยู่ในหน้าผลค้นหา ต้องไปดึงมาต่างหาก
@@ -1215,7 +1222,7 @@
           sup += willSup.length;
           lastReport.push({ ...kr, result: 'จะโหลด', file: name, folder: kParts.join('\\') });
           log(`[${i}/${items.length}] + ${name}  →  ${kParts.join('\\')}`, 'ok');
-          if (copyNew && useFS) log(`      ↳ สำเนาไป ${copyParts(k.stamp).join('\\')}\\${name}`, 'sk');
+          if (copyNew && useFS) log(`      ↳ สำเนาไป ${copyParts(k.stamp, isNewDoc).join('\\')}\\${name}`, 'sk');
           for (const h of willSup) {
             lastReport.push({ ...kr, rev: h.rev, result: 'จะย้ายเข้า _Superseded', file: h.name,
                               folder: (h.path || kParts).concat(CFG.supersededDir).join('\\') });
@@ -1249,7 +1256,7 @@
               // สำเนาไว้ใน _Updated ที่ชั้นนอกสุด — ไม่แยกวันที่ ตราประทับอยู่ใน Comment File
               if (copyNew) {
                 try {
-                  await writeInto(await ensureDir(copyParts(k.stamp)), name, blob);
+                  await writeInto(await ensureDir(copyParts(k.stamp, isNewDoc)), name, blob);
                 } catch (e) { log(`      ↳ ทำสำเนาไป ${CFG.updatedDir} ไม่สำเร็จ: ${e.message}`, 'wn'); }
               }
             } else {

@@ -1280,23 +1280,43 @@
   "<label><input type=\"checkbox\" id=\"edl-copynew\" checked> Also copy anything newly downloaded into an <b>_Updated</b> folder</label>"
  ],
  [
-  "// ปลายทางของสำเนาใน _Updated — ไม่แยกวันที่",
-  "// Where the copy lands inside _Updated - no dated folders"
- ],
- [
-  "// ไฟล์ตราประทับแยกเข้า _Updated\\Comment File เหมือนโฟลเดอร์เอกสารจริง จะได้ไม่ชนกับ PDF ต้นฉบับ",
-  "// Stamped copies go to _Updated\\Comment File, same shape as the real document folder, so they never clash with the plain PDF"
- ],
- [
-  "if (copyNew && useFS) log(`      ↳ สำเนาไป ${copyParts(k.stamp).join('\\\\')}\\\\${name}`, 'sk');",
-  "if (copyNew && useFS) log(`      ↳ copy to ${copyParts(k.stamp).join('\\\\')}\\\\${name}`, 'sk');"
- ],
- [
   "// สำเนาไว้ใน _Updated ที่ชั้นนอกสุด — ไม่แยกวันที่ ตราประทับอยู่ใน Comment File",
   "// Copy into _Updated at the top level - no dated folders, stamped ones under Comment File"
  ],
  [
-  "<div class=\"hint\">โฟลเดอร์เดียวที่ชั้นนอกสุด ไม่แยกวันที่ · ไฟล์ตราประทับอยู่ใน <b>_Updated\\Comment File</b> · เป็นสำเนา ไฟล์จริงยังอยู่ที่เดิม อ่านแล้วลบทิ้งได้ตลอด</div>",
-  "<div class=\"hint\">One folder at the top level, no dated sub-folders. Stamped copies go to <b>_Updated\\Comment File</b>. These are copies - the real files stay where they are, so delete them once read.</div>"
+  "newDir: 'New',                // เอกสารที่ยังไม่เคยมีไฟล์ในโฟลเดอร์",
+  "newDir: 'New',                // documents with no file in the folder yet"
+ ],
+ [
+  "revisedDir: 'Revised',        // เอกสารเดิมที่ ConZoL ออก Rev ใหม่",
+  "revisedDir: 'Revised',        // documents already on disk that ConZoL has re-issued"
+ ],
+ [
+  "// ปลายทางของสำเนาใน _Updated — ไม่แยกวันที่ แต่แยกว่าเป็นเอกสารใหม่หรือ Rev ใหม่",
+  "// Where the copy lands inside _Updated - no dated folders, but new documents are kept apart from new revisions"
+ ],
+ [
+  "//   New      = ยังไม่เคยมีไฟล์ของเอกสารนี้ในโฟลเดอร์เลย (เพิ่งขึ้น ConZoL หรือยังไม่เคยโหลด)",
+  "//   New      = no file of this document in the folder at all (just added to ConZoL, or never downloaded)"
+ ],
+ [
+  "//   Revised  = มีอยู่แล้ว แต่ ConZoL ออก Rev ใหม่",
+  "//   Revised  = already on disk, but ConZoL issued a newer revision"
+ ],
+ [
+  "// ไฟล์ตราประทับแยกเข้า Comment File เหมือนโฟลเดอร์เอกสารจริง จะได้ไม่ชนกับ PDF ต้นฉบับ",
+  "// Stamped copies go under Comment File, the same shape as the real document folder, so they never clash with the plain PDF"
+ ],
+ [
+  "// ดูก่อนเริ่มโหลด: ยังไม่มีไฟล์ของเอกสารนี้เลย = ของใหม่ (have จะโตขึ้นระหว่างรอบ)",
+  "// Checked before downloading: no file of this document yet = new (have grows during the run)"
+ ],
+ [
+  "if (copyNew && useFS) log(`      ↳ สำเนาไป ${copyParts(k.stamp, isNewDoc).join('\\\\')}\\\\${name}`, 'sk');",
+  "if (copyNew && useFS) log(`      ↳ copy to ${copyParts(k.stamp, isNewDoc).join('\\\\')}\\\\${name}`, 'sk');"
+ ],
+ [
+  "<div class=\"hint\">ไม่แยกวันที่ แยกเป็น <b>New</b> (ยังไม่เคยมีไฟล์ในโฟลเดอร์ / เพิ่งขึ้น ConZoL) กับ <b>Revised</b> (Rev ใหม่ของเอกสารเดิม) · ตราประทับอยู่ใน <b>Comment File</b> ของแต่ละอัน · เป็นสำเนา ไฟล์จริงยังอยู่ที่เดิม อ่านแล้วลบทิ้งได้ตลอด</div>",
+  "<div class=\"hint\">No dated folders. Split into <b>New</b> (no file in the folder yet, or just added to ConZoL) and <b>Revised</b> (a newer revision of a document already on disk), each with its own <b>Comment File</b> for stamped copies. These are copies - the real files stay where they are, so delete them once read.</div>"
  ]
 ]

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GULF ConZoL - Auto Download + Rename + Sort
 // @namespace    gmtp.conzol
-// @version      7.0
+// @version      7.1
 // @description  Download PDFs and native attachments from GULF ConZoL EDMS automatically - names each file and sorts it into the folder ConZoL assigns.
 // @match        https://edms.gulf.co.th/dms/drawing.asp*
 // @match        http://edms.gulf.co.th/dms/drawing.asp*
@@ -22,7 +22,7 @@
   // If a panel already exists the later copy stops here - otherwise ids collide and buttons stop responding
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '7.0';   // kept in sync with @version at build time
+  const VERSION = '7.1';   // kept in sync with @version at build time
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.user.js';   // filled in per language at build time
 
   // ---------------- Settings ----------------
@@ -38,6 +38,8 @@
     commentDir: 'Comment File',   // the stamped copies the owner returns, kept with the document itself
     unsortedDir: '_Unsorted',
     updatedDir: '_Updated',       // copies of whatever was just downloaded, all in one folder at the top
+    newDir: 'New',                // documents with no file in the folder yet
+    revisedDir: 'Revised',        // documents already on disk that ConZoL has re-issued
     // Folders never touched - not scanned, not re-sorted (cancelled MDR documents live here)
     // _Updated holds copies, not the real files - never scan or re-sort it, or they count as already downloaded
     ignoreDirs: ['_Deleted', '_Archive', '_Cancelled', '_Updated']
@@ -152,9 +154,12 @@
     return base + sfx + '.' + String(ext || 'pdf').toLowerCase();
   }
 
-  // Where the copy lands inside _Updated - no dated folders
-  // Stamped copies go to _Updated\Comment File, same shape as the real document folder, so they never clash with the plain PDF
-  const copyParts = (stamp) => stamp ? [CFG.updatedDir, CFG.commentDir] : [CFG.updatedDir];
+  // Where the copy lands inside _Updated - no dated folders, but new documents are kept apart from new revisions
+  //   New      = no file of this document in the folder at all (just added to ConZoL, or never downloaded)
+  //   Revised  = already on disk, but ConZoL issued a newer revision
+  // Stamped copies go under Comment File, the same shape as the real document folder, so they never clash with the plain PDF
+  const copyParts = (stamp, isNew) => [CFG.updatedDir, isNew ? CFG.newDir : CFG.revisedDir]
+    .concat(stamp ? [CFG.commentDir] : []);
 
   const sanitizeFolder = (s) => String(s).replace(/[\\/:*?"<>|\r\n\t]/g, '-')
     .replace(/\s+/g, ' ').replace(/[. ]+$/g, '').trim().slice(0, 100) || '_Unsorted';
@@ -827,7 +832,7 @@
         <label><input type="checkbox" id="edl-area" checked> Sub-folder per area code (1400 / 0500 / PCC …)</label>
         <label><input type="checkbox" id="edl-inactive"> Include non-active documents in search</label>
         <label><input type="checkbox" id="edl-copynew" checked> Also copy anything newly downloaded into an <b>_Updated</b> folder</label>
-        <div class="hint">One folder at the top level, no dated sub-folders. Stamped copies go to <b>_Updated\Comment File</b>. These are copies - the real files stay where they are, so delete them once read.</div>
+        <div class="hint">No dated folders. Split into <b>New</b> (no file in the folder yet, or just added to ConZoL) and <b>Revised</b> (a newer revision of a document already on disk), each with its own <b>Comment File</b> for stamped copies. These are copies - the real files stay where they are, so delete them once read.</div>
         <button id="edl-csv">Save CSV report</button>
       </div>
 
@@ -1152,6 +1157,8 @@
       const rank = rm ? revRank(rm[1], rm[2]) : -1;
       if (!existing.has(doc)) existing.set(doc, []);
       const have = existing.get(doc);
+      // Checked before downloading: no file of this document yet = new (have grows during the run)
+      const isNewDoc = have.length === 0;
       const parts = targetPath(doc, r.groupCode, r.groupName);
 
       // R.Code and the stamped copy live in the history table, not in the search results - fetch them separately
@@ -1232,7 +1239,7 @@
           sup += willSup.length;
           lastReport.push({ ...kr, result: 'Will download', file: name, folder: kParts.join('\\') });
           log(`[${i}/${items.length}] + ${name}  →  ${kParts.join('\\')}`, 'ok');
-          if (copyNew && useFS) log(`      ↳ copy to ${copyParts(k.stamp).join('\\')}\\${name}`, 'sk');
+          if (copyNew && useFS) log(`      ↳ copy to ${copyParts(k.stamp, isNewDoc).join('\\')}\\${name}`, 'sk');
           for (const h of willSup) {
             lastReport.push({ ...kr, rev: h.rev, result: 'Will move to _Superseded', file: h.name,
                               folder: (h.path || kParts).concat(CFG.supersededDir).join('\\') });
@@ -1266,7 +1273,7 @@
               // Copy into _Updated at the top level - no dated folders, stamped ones under Comment File
               if (copyNew) {
                 try {
-                  await writeInto(await ensureDir(copyParts(k.stamp)), name, blob);
+                  await writeInto(await ensureDir(copyParts(k.stamp, isNewDoc)), name, blob);
                 } catch (e) { log(`      ↳ could not copy into ${CFG.updatedDir}: ${e.message}`, 'wn'); }
               }
             } else {
