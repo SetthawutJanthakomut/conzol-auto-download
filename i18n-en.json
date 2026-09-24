@@ -1312,11 +1312,43 @@
   "// Checked before downloading: no file of this document yet = new (have grows during the run)"
  ],
  [
-  "if (copyNew && useFS) log(`      ↳ สำเนาไป ${copyParts(k.stamp, isNewDoc).join('\\\\')}\\\\${name}`, 'sk');",
-  "if (copyNew && useFS) log(`      ↳ copy to ${copyParts(k.stamp, isNewDoc).join('\\\\')}\\\\${name}`, 'sk');"
- ],
- [
   "<div class=\"hint\">ไม่แยกวันที่ แยกเป็น <b>New</b> (ยังไม่เคยมีไฟล์ในโฟลเดอร์ / เพิ่งขึ้น ConZoL) กับ <b>Revised</b> (Rev ใหม่ของเอกสารเดิม) · ตราประทับอยู่ใน <b>Comment File</b> ของแต่ละอัน · เป็นสำเนา ไฟล์จริงยังอยู่ที่เดิม อ่านแล้วลบทิ้งได้ตลอด</div>",
   "<div class=\"hint\">No dated folders. Split into <b>New</b> (no file in the folder yet, or just added to ConZoL) and <b>Revised</b> (a newer revision of a document already on disk), each with its own <b>Comment File</b> for stamped copies. These are copies - the real files stay where they are, so delete them once read.</div>"
+ ],
+ [
+  "// อ่านว่าตอนนี้ใน _Updated มีสำเนาของเอกสารไหนอยู่บ้าง — เอาไว้ลบตัวเก่าทิ้งเมื่อมีตัวใหม่เข้ามา",
+  "// Read which copies are sitting in _Updated right now, so an older one can be deleted when a newer arrives"
+ ],
+ [
+  "// คีย์ = เลขเอกสาร + ชนิด (ไฟล์ปกติ / ตราประทับ) เพราะสองอย่างนี้อยู่คนละโฟลเดอร์และไม่ใช่ตัวแทนกัน",
+  "// Key = document number + kind (plain / stamped): they live in different folders and do not replace each other"
+ ],
+ [
+  "// ทะเบียนสำเนาเดิมใน _Updated — พอมีตัวใหม่เข้ามา ตัวเก่าของเอกสารเดียวกันถูกลบทิ้ง",
+  "// Index of the copies already in _Updated - when a newer one arrives, the older copy of that document is deleted"
+ ],
+ [
+  "log(`      ↳ สำเนาไป ${copyParts(k.stamp, isNewDoc).join('\\\\')}\\\\${name}`, 'sk');",
+  "log(`      ↳ copy to ${copyParts(k.stamp, isNewDoc).join('\\\\')}\\\\${name}`, 'sk');"
+ ],
+ [
+  "if (o.name !== name) log(`      ↳ จะลบสำเนาเก่า ${o.name} ออกจาก ${CFG.updatedDir}`, 'wn');",
+  "if (o.name !== name) log(`      ↳ would delete the older copy ${o.name} from ${CFG.updatedDir}`, 'wn');"
+ ],
+ [
+  "// เหลือไว้ตัวเดียวต่อเอกสาร — สำเนาเก่ากว่าลบทิ้ง รวมถึงตัวที่ค้างอยู่ใน New ตอนย้ายมา Revised",
+  "// One copy per document - older ones are deleted, including the one left in New when it moves to Revised"
+ ],
+ [
+  "upDel++; log(`      ↳ ลบสำเนาเก่า ${o.name} ออกจาก ${CFG.updatedDir}`, 'wn');",
+  "upDel++; log(`      ↳ deleted the older copy ${o.name} from ${CFG.updatedDir}`, 'wn');"
+ ],
+ [
+  "} catch (e) { log(`      ↳ ลบสำเนาเก่า ${o.name} ไม่ได้: ${e.message}`, 'wn'); }",
+  "} catch (e) { log(`      ↳ could not delete the older copy ${o.name}: ${e.message}`, 'wn'); }"
+ ],
+ [
+  " · ล้าง _Updated ${s.upDel}",
+  " · cleared from _Updated ${s.upDel}"
  ]
 ]

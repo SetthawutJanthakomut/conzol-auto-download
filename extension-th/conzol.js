@@ -8,7 +8,7 @@
   // ถ้ามีกล่องอยู่แล้ว ให้ชุดที่มาทีหลังหยุดทำงาน ไม่งั้น id จะซ้ำและปุ่มจะกดไม่ติด
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '7.1';   // ซิงก์อัตโนมัติจาก @version ตอน build
+  const VERSION = '7.2';   // ซิงก์อัตโนมัติจาก @version ตอน build
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.th.user.js';   // build.py ใส่ให้ตามภาษา
 
   // ---------------- ตั้งค่าได้ตรงนี้ ----------------
@@ -292,6 +292,27 @@
         handle: entry
       });
     }
+    return out;
+  }
+
+  // อ่านว่าตอนนี้ใน _Updated มีสำเนาของเอกสารไหนอยู่บ้าง — เอาไว้ลบตัวเก่าทิ้งเมื่อมีตัวใหม่เข้ามา
+  // คีย์ = เลขเอกสาร + ชนิด (ไฟล์ปกติ / ตราประทับ) เพราะสองอย่างนี้อยู่คนละโฟลเดอร์และไม่ใช่ตัวแทนกัน
+  async function indexUpdated() {
+    const out = new Map();
+    if (!rootDir) return out;
+    let up;
+    try { up = await rootDir.getDirectoryHandle(CFG.updatedDir); } catch (e) { return out; }
+    const walk = async (dir, path) => {
+      for await (const entry of dir.values()) {
+        if (entry.kind === 'directory') { await walk(entry, path.concat(entry.name)); continue; }
+        const m = FN_RE.exec(entry.name);
+        if (!m) continue;
+        const key = m[1].toUpperCase() + '|' + (isStampPath(path) ? 'stamp' : 'file');
+        if (!out.has(key)) out.set(key, []);
+        out.get(key).push({ parent: dir, name: entry.name });
+      }
+    };
+    try { await walk(up, []); } catch (e) {}
     return out;
   }
 
@@ -1126,13 +1147,16 @@
     const wantFile = el('edl-getfile').checked;
     const wantStamp = el('edl-getstamp').checked;
     const copyNew = el('edl-copynew').checked;
+    // ทะเบียนสำเนาเดิมใน _Updated — พอมีตัวใหม่เข้ามา ตัวเก่าของเอกสารเดียวกันถูกลบทิ้ง
+    const upIndex = (copyNew && !!rootDir) ? await indexUpdated() : new Map();
+    let upDel = 0;
     const wantRCode = el('edl-rcode').checked;
     const revCache = new Map();   // fileid -> ประวัติ Rev เผื่อเอกสารเดิมโผล่ซ้ำ
     const useFS = !!rootDir;
 
     if (!wantPdf && !wantFile && !wantStamp) {
       log('· ยังไม่ได้เลือกว่าจะโหลดอะไร — ติ๊ก PDF, ไฟล์แนบ หรือ ไฟล์ที่มีตราประทับ อย่างน้อยหนึ่งอย่าง', 'er');
-      return { ok, skipped, fail, sup };
+      return { ok, skipped, fail, sup, upDel };
     }
 
     for (let r of items) {
@@ -1225,7 +1249,12 @@
           sup += willSup.length;
           lastReport.push({ ...kr, result: 'จะโหลด', file: name, folder: kParts.join('\\') });
           log(`[${i}/${items.length}] + ${name}  →  ${kParts.join('\\')}`, 'ok');
-          if (copyNew && useFS) log(`      ↳ สำเนาไป ${copyParts(k.stamp, isNewDoc).join('\\')}\\${name}`, 'sk');
+          if (copyNew && useFS) {
+            log(`      ↳ สำเนาไป ${copyParts(k.stamp, isNewDoc).join('\\')}\\${name}`, 'sk');
+            for (const o of upIndex.get(doc + '|' + kind) || []) {
+              if (o.name !== name) log(`      ↳ จะลบสำเนาเก่า ${o.name} ออกจาก ${CFG.updatedDir}`, 'wn');
+            }
+          }
           for (const h of willSup) {
             lastReport.push({ ...kr, rev: h.rev, result: 'จะย้ายเข้า _Superseded', file: h.name,
                               folder: (h.path || kParts).concat(CFG.supersededDir).join('\\') });
@@ -1259,7 +1288,21 @@
               // สำเนาไว้ใน _Updated ที่ชั้นนอกสุด — ไม่แยกวันที่ ตราประทับอยู่ใน Comment File
               if (copyNew) {
                 try {
-                  await writeInto(await ensureDir(copyParts(k.stamp, isNewDoc)), name, blob);
+                  const cdir = await ensureDir(copyParts(k.stamp, isNewDoc));
+                  await writeInto(cdir, name, blob);
+                  // เหลือไว้ตัวเดียวต่อเอกสาร — สำเนาเก่ากว่าลบทิ้ง รวมถึงตัวที่ค้างอยู่ใน New ตอนย้ายมา Revised
+                  const ukey = doc + '|' + kind;
+                  const olds = upIndex.get(ukey) || [];
+                  for (const o of olds.slice()) {
+                    if (o.name === name) continue;
+                    try {
+                      await o.parent.removeEntry(o.name);
+                      upDel++; log(`      ↳ ลบสำเนาเก่า ${o.name} ออกจาก ${CFG.updatedDir}`, 'wn');
+                    } catch (e) { log(`      ↳ ลบสำเนาเก่า ${o.name} ไม่ได้: ${e.message}`, 'wn'); }
+                    const ix = olds.indexOf(o); if (ix >= 0) olds.splice(ix, 1);
+                  }
+                  if (!olds.some((o) => o.name === name)) olds.push({ parent: cdir, name });
+                  upIndex.set(ukey, olds);
                 } catch (e) { log(`      ↳ ทำสำเนาไป ${CFG.updatedDir} ไม่สำเร็จ: ${e.message}`, 'wn'); }
               }
             } else {
@@ -1279,7 +1322,7 @@
         await sleep(CFG.delayMs);
       }
     }
-    return { ok, skipped, fail, sup };
+    return { ok, skipped, fail, sup, upDel };
   }
 
   async function preflight() {
@@ -1306,8 +1349,8 @@
     log(`พบ ${rows.length} รายการในหน้านี้`);
     const s = await runDownload(rows.map((r) => ({ ...r, sheet: '' })), dry);
     statusEl.textContent = dry
-      ? `ผลการเช็ค: จะโหลด ${s.ok} · ข้าม ${s.skipped}` + (s.sup ? ` · เก่า→_Superseded ${s.sup}` : '')
-      : `เสร็จ: สำเร็จ ${s.ok} · ข้าม ${s.skipped} · ผิดพลาด ${s.fail}` + (s.sup ? ` · เก่า→_Superseded ${s.sup}` : '');
+      ? `ผลการเช็ค: จะโหลด ${s.ok} · ข้าม ${s.skipped}` + (s.sup ? ` · เก่า→_Superseded ${s.sup}` : '') + (s.upDel ? ` · ล้าง _Updated ${s.upDel}` : '')
+      : `เสร็จ: สำเร็จ ${s.ok} · ข้าม ${s.skipped} · ผิดพลาด ${s.fail}` + (s.sup ? ` · เก่า→_Superseded ${s.sup}` : '') + (s.upDel ? ` · ล้าง _Updated ${s.upDel}` : '');
     showDirInfo();
     log(dry ? '— จบการเช็ค (ยังไม่ได้โหลด) — กด "บันทึกรายงาน CSV" เพื่อเก็บผล' : '— จบการทำงาน —');
     running = false;
@@ -1379,8 +1422,8 @@
     if (items.length) {
       const s = await runDownload(items, dry);
       statusEl.textContent = dry
-        ? `ผลการเช็ค: จะโหลด ${s.ok} · ข้าม ${s.skipped} · ไม่พบ ${notFound.length}` + (s.sup ? ` · เก่า→_Superseded ${s.sup}` : '')
-        : `เสร็จ: สำเร็จ ${s.ok} · ข้าม ${s.skipped} · ผิดพลาด ${s.fail} · ไม่พบ ${notFound.length}` + (s.sup ? ` · เก่า→_Superseded ${s.sup}` : '');
+        ? `ผลการเช็ค: จะโหลด ${s.ok} · ข้าม ${s.skipped} · ไม่พบ ${notFound.length}` + (s.sup ? ` · เก่า→_Superseded ${s.sup}` : '') + (s.upDel ? ` · ล้าง _Updated ${s.upDel}` : '')
+        : `เสร็จ: สำเร็จ ${s.ok} · ข้าม ${s.skipped} · ผิดพลาด ${s.fail} · ไม่พบ ${notFound.length}` + (s.sup ? ` · เก่า→_Superseded ${s.sup}` : '') + (s.upDel ? ` · ล้าง _Updated ${s.upDel}` : '');
     } else statusEl.textContent = `ไม่มีรายการให้โหลด (ไม่พบ ${notFound.length})`;
     showDirInfo();
     log(dry ? '— จบการเช็ค (ยังไม่ได้โหลด) — กด "บันทึกรายงาน CSV" เพื่อเก็บผล'
@@ -1556,7 +1599,7 @@
         const s = await runDownload(items.map((r) => ({ ...r, sheet: 'watchlist' })), dry);
         statusEl.textContent = (dry ? 'ผลการเช็ค: จะโหลด ' : 'เสร็จ: สำเร็จ ') + s.ok
           + ` · ข้าม ${s.skipped}` + (dry ? '' : ` · ผิดพลาด ${s.fail}`)
-          + (s.sup ? ` · เก่า→_Superseded ${s.sup}` : '');
+          + (s.sup ? ` · เก่า→_Superseded ${s.sup}` : '') + (s.upDel ? ` · ล้าง _Updated ${s.upDel}` : '');
       } else statusEl.textContent = 'ไม่พบเอกสารตาม watchlist';
       showDirInfo();
       log(dry ? '— จบการเช็ค (ยังไม่ได้โหลด) —' : '— จบการทำงาน —');

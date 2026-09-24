@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GULF ConZoL - Auto Download + Rename + Sort
 // @namespace    gmtp.conzol
-// @version      7.1
+// @version      7.2
 // @description  Download PDFs and native attachments from GULF ConZoL EDMS automatically - names each file and sorts it into the folder ConZoL assigns.
 // @match        https://edms.gulf.co.th/dms/drawing.asp*
 // @match        http://edms.gulf.co.th/dms/drawing.asp*
@@ -22,7 +22,7 @@
   // If a panel already exists the later copy stops here - otherwise ids collide and buttons stop responding
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '7.1';   // kept in sync with @version at build time
+  const VERSION = '7.2';   // kept in sync with @version at build time
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.user.js';   // filled in per language at build time
 
   // ---------------- Settings ----------------
@@ -306,6 +306,27 @@
         handle: entry
       });
     }
+    return out;
+  }
+
+  // Read which copies are sitting in _Updated right now, so an older one can be deleted when a newer arrives
+  // Key = document number + kind (plain / stamped): they live in different folders and do not replace each other
+  async function indexUpdated() {
+    const out = new Map();
+    if (!rootDir) return out;
+    let up;
+    try { up = await rootDir.getDirectoryHandle(CFG.updatedDir); } catch (e) { return out; }
+    const walk = async (dir, path) => {
+      for await (const entry of dir.values()) {
+        if (entry.kind === 'directory') { await walk(entry, path.concat(entry.name)); continue; }
+        const m = FN_RE.exec(entry.name);
+        if (!m) continue;
+        const key = m[1].toUpperCase() + '|' + (isStampPath(path) ? 'stamp' : 'file');
+        if (!out.has(key)) out.set(key, []);
+        out.get(key).push({ parent: dir, name: entry.name });
+      }
+    };
+    try { await walk(up, []); } catch (e) {}
     return out;
   }
 
@@ -1140,13 +1161,16 @@
     const wantFile = el('edl-getfile').checked;
     const wantStamp = el('edl-getstamp').checked;
     const copyNew = el('edl-copynew').checked;
+    // Index of the copies already in _Updated - when a newer one arrives, the older copy of that document is deleted
+    const upIndex = (copyNew && !!rootDir) ? await indexUpdated() : new Map();
+    let upDel = 0;
     const wantRCode = el('edl-rcode').checked;
     const revCache = new Map();   // fileid -> revision history, in case a document comes round twice
     const useFS = !!rootDir;
 
     if (!wantPdf && !wantFile && !wantStamp) {
       log('. Nothing selected to download - tick PDF, the native attachment, or the stamped copy', 'er');
-      return { ok, skipped, fail, sup };
+      return { ok, skipped, fail, sup, upDel };
     }
 
     for (let r of items) {
@@ -1239,7 +1263,12 @@
           sup += willSup.length;
           lastReport.push({ ...kr, result: 'Will download', file: name, folder: kParts.join('\\') });
           log(`[${i}/${items.length}] + ${name}  →  ${kParts.join('\\')}`, 'ok');
-          if (copyNew && useFS) log(`      ↳ copy to ${copyParts(k.stamp, isNewDoc).join('\\')}\\${name}`, 'sk');
+          if (copyNew && useFS) {
+            log(`      ↳ copy to ${copyParts(k.stamp, isNewDoc).join('\\')}\\${name}`, 'sk');
+            for (const o of upIndex.get(doc + '|' + kind) || []) {
+              if (o.name !== name) log(`      ↳ would delete the older copy ${o.name} from ${CFG.updatedDir}`, 'wn');
+            }
+          }
           for (const h of willSup) {
             lastReport.push({ ...kr, rev: h.rev, result: 'Will move to _Superseded', file: h.name,
                               folder: (h.path || kParts).concat(CFG.supersededDir).join('\\') });
@@ -1273,7 +1302,21 @@
               // Copy into _Updated at the top level - no dated folders, stamped ones under Comment File
               if (copyNew) {
                 try {
-                  await writeInto(await ensureDir(copyParts(k.stamp, isNewDoc)), name, blob);
+                  const cdir = await ensureDir(copyParts(k.stamp, isNewDoc));
+                  await writeInto(cdir, name, blob);
+                  // One copy per document - older ones are deleted, including the one left in New when it moves to Revised
+                  const ukey = doc + '|' + kind;
+                  const olds = upIndex.get(ukey) || [];
+                  for (const o of olds.slice()) {
+                    if (o.name === name) continue;
+                    try {
+                      await o.parent.removeEntry(o.name);
+                      upDel++; log(`      ↳ deleted the older copy ${o.name} from ${CFG.updatedDir}`, 'wn');
+                    } catch (e) { log(`      ↳ could not delete the older copy ${o.name}: ${e.message}`, 'wn'); }
+                    const ix = olds.indexOf(o); if (ix >= 0) olds.splice(ix, 1);
+                  }
+                  if (!olds.some((o) => o.name === name)) olds.push({ parent: cdir, name });
+                  upIndex.set(ukey, olds);
                 } catch (e) { log(`      ↳ could not copy into ${CFG.updatedDir}: ${e.message}`, 'wn'); }
               }
             } else {
@@ -1293,7 +1336,7 @@
         await sleep(CFG.delayMs);
       }
     }
-    return { ok, skipped, fail, sup };
+    return { ok, skipped, fail, sup, upDel };
   }
 
   async function preflight() {
@@ -1320,8 +1363,8 @@
     log(`Found ${rows.length} document(s) on this page`);
     const s = await runDownload(rows.map((r) => ({ ...r, sheet: '' })), dry);
     statusEl.textContent = dry
-      ? `Check: would download ${s.ok} · skip ${s.skipped}` + (s.sup ? ` · superseded ${s.sup}` : '')
-      : `Done: downloaded ${s.ok} · skipped ${s.skipped} · failed ${s.fail}` + (s.sup ? ` · superseded ${s.sup}` : '');
+      ? `Check: would download ${s.ok} · skip ${s.skipped}` + (s.sup ? ` · superseded ${s.sup}` : '') + (s.upDel ? ` · cleared from _Updated ${s.upDel}` : '')
+      : `Done: downloaded ${s.ok} · skipped ${s.skipped} · failed ${s.fail}` + (s.sup ? ` · superseded ${s.sup}` : '') + (s.upDel ? ` · cleared from _Updated ${s.upDel}` : '');
     showDirInfo();
     log(dry ? '— Check finished (nothing downloaded) — press "Save CSV report" to keep the list' : '— Finished —');
     running = false;
@@ -1393,8 +1436,8 @@
     if (items.length) {
       const s = await runDownload(items, dry);
       statusEl.textContent = dry
-        ? `Check: would download ${s.ok} · skip ${s.skipped} · not found ${notFound.length}` + (s.sup ? ` · superseded ${s.sup}` : '')
-        : `Done: downloaded ${s.ok} · skipped ${s.skipped} · failed ${s.fail} · not found ${notFound.length}` + (s.sup ? ` · superseded ${s.sup}` : '');
+        ? `Check: would download ${s.ok} · skip ${s.skipped} · not found ${notFound.length}` + (s.sup ? ` · superseded ${s.sup}` : '') + (s.upDel ? ` · cleared from _Updated ${s.upDel}` : '')
+        : `Done: downloaded ${s.ok} · skipped ${s.skipped} · failed ${s.fail} · not found ${notFound.length}` + (s.sup ? ` · superseded ${s.sup}` : '') + (s.upDel ? ` · cleared from _Updated ${s.upDel}` : '');
     } else statusEl.textContent = `Nothing to download (${notFound.length} not found)`;
     showDirInfo();
     log(dry ? '— Check finished (nothing downloaded) — press "Save CSV report" to keep the list'
@@ -1570,7 +1613,7 @@
         const s = await runDownload(items.map((r) => ({ ...r, sheet: 'watchlist' })), dry);
         statusEl.textContent = (dry ? 'Check: would download ' : 'Done: downloaded ') + s.ok
           + ` · skipped ${s.skipped}` + (dry ? '' : ` · failed ${s.fail}`)
-          + (s.sup ? ` · superseded ${s.sup}` : '');
+          + (s.sup ? ` · superseded ${s.sup}` : '') + (s.upDel ? ` · cleared from _Updated ${s.upDel}` : '');
       } else statusEl.textContent = 'No documents matched the watch list';
       showDirInfo();
       log(dry ? '— Check finished (nothing downloaded) —' : '— Finished —');
