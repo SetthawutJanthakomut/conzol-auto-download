@@ -8,7 +8,7 @@
   // ถ้ามีกล่องอยู่แล้ว ให้ชุดที่มาทีหลังหยุดทำงาน ไม่งั้น id จะซ้ำและปุ่มจะกดไม่ติด
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '7.2';   // ซิงก์อัตโนมัติจาก @version ตอน build
+  const VERSION = '7.3';   // ซิงก์อัตโนมัติจาก @version ตอน build
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.th.user.js';   // build.py ใส่ให้ตามภาษา
 
   // ---------------- ตั้งค่าได้ตรงนี้ ----------------
@@ -26,6 +26,7 @@
     updatedDir: '_Updated',       // สำเนาไฟล์ที่เพิ่งโหลดใหม่ กองรวมโฟลเดอร์เดียวที่ชั้นนอกสุด
     newDir: 'New',                // เอกสารที่ยังไม่เคยมีไฟล์ในโฟลเดอร์
     revisedDir: 'Revised',        // เอกสารเดิมที่ ConZoL ออก Rev ใหม่
+    updatedKeepDays: 7,           // สำเนาใน _Updated เก่ากว่านี้ (วัน) ถือว่าอ่านแล้ว ลบทิ้ง · 0 = ไม่ลบตามอายุ
     // โฟลเดอร์ที่ห้ามแตะ — ไม่สแกน ไม่จัดใหม่ (เอกสารที่ถูกยกเลิกใน MDR อยู่ในนี้)
     // _Updated เป็นสำเนา ไม่ใช่ตัวจริง ต้องไม่สแกนและไม่จัดใหม่ ไม่งั้นระบบจะนับว่าโหลดแล้ว
     ignoreDirs: ['_Deleted', '_Archive', '_เก็บ', '_Updated']
@@ -144,6 +145,13 @@
   //   New      = ยังไม่เคยมีไฟล์ของเอกสารนี้ในโฟลเดอร์เลย (เพิ่งขึ้น ConZoL หรือยังไม่เคยโหลด)
   //   Revised  = มีอยู่แล้ว แต่ ConZoL ออก Rev ใหม่
   // ไฟล์ตราประทับแยกเข้า Comment File เหมือนโฟลเดอร์เอกสารจริง จะได้ไม่ชนกับ PDF ต้นฉบับ
+  // จำนวนวันที่เก็บสำเนาไว้ใน _Updated — อ่านจากช่องในแท็บตั้งค่า ถ้าว่างหรือพังใช้ค่า default
+  function keepDays() {
+    const c = el('edl-keepdays');
+    const v = c ? parseInt(c.value, 10) : NaN;
+    return Number.isFinite(v) && v >= 0 ? v : CFG.updatedKeepDays;
+  }
+
   const copyParts = (stamp, isNew) => [CFG.updatedDir, isNew ? CFG.newDir : CFG.revisedDir]
     .concat(stamp ? [CFG.commentDir] : []);
 
@@ -314,6 +322,43 @@
     };
     try { await walk(up, []); } catch (e) {}
     return out;
+  }
+
+  // ลบสำเนาใน _Updated ที่เก่าเกินกำหนด — ดูจากวันที่ของไฟล์เอง (คือวันที่โหลดมา)
+  // ลบเฉพาะในโฟลเดอร์สำเนาเท่านั้น ไฟล์จริงในโฟลเดอร์เอกสารไม่ถูกแตะ
+  async function pruneUpdated(days, dry) {
+    if (!rootDir || !(days > 0)) return 0;
+    let up;
+    try { up = await rootDir.getDirectoryHandle(CFG.updatedDir); } catch (e) { return 0; }
+    const cutoff = Date.now() - days * 86400000;
+    const ageOf = (t) => Math.round((Date.now() - t) / 86400000);
+    let gone = 0;
+    // คืนจำนวนที่ยังเหลือในโฟลเดอร์ เพื่อเก็บกวาดโฟลเดอร์ย่อยที่ว่างแล้วออกด้วย
+    const walk = async (dir) => {
+      const doomed = [], subs = [];
+      let left = 0;
+      for await (const entry of dir.values()) {
+        if (entry.kind === 'directory') { subs.push(entry); continue; }
+        try {
+          const f = await entry.getFile();
+          if (f.lastModified < cutoff) { doomed.push({ name: entry.name, at: f.lastModified }); continue; }
+        } catch (e) {}
+        left++;
+      }
+      for (const d of doomed) {
+        log(`      ↳ ${dry ? 'จะลบ' : 'ลบ'}สำเนาอายุ ${ageOf(d.at)} วัน: ${d.name}`, 'sk');
+        if (dry) { gone++; continue; }
+        try { await dir.removeEntry(d.name); gone++; } catch (e) { left++; }
+      }
+      for (const sub of subs) {
+        const rest = await walk(sub);
+        if (rest > 0) left++;
+        else if (!dry) { try { await dir.removeEntry(sub.name); } catch (e) { left++; } }
+      }
+      return left;
+    };
+    try { await walk(up); } catch (e) {}
+    return gone;
   }
 
   async function refreshExisting() {
@@ -839,6 +884,9 @@
         <label><input type="checkbox" id="edl-area" checked> แยกโฟลเดอร์ย่อยตามพื้นที่ (1400 / 0500 / PCC …)</label>
         <label><input type="checkbox" id="edl-inactive"> ค้นรวมเอกสารที่ไม่ Active</label>
         <label><input type="checkbox" id="edl-copynew" checked> คัดลอกไฟล์ที่โหลดใหม่ไว้ในโฟลเดอร์ <b>_Updated</b> ด้วย</label>
+        <div style="margin-top:3px">ลบสำเนาใน <b>_Updated</b> ที่เก่าเกิน
+          <input id="edl-keepdays" type="number" min="0" max="365" step="1" value="7"
+                 style="width:46px;font:11px Consolas,monospace"> วัน <span class="sk">(0 = ไม่ลบตามอายุ)</span></div>
         <div class="hint">ไม่แยกวันที่ แยกเป็น <b>New</b> (ยังไม่เคยมีไฟล์ในโฟลเดอร์ / เพิ่งขึ้น ConZoL) กับ <b>Revised</b> (Rev ใหม่ของเอกสารเดิม) · ตราประทับอยู่ใน <b>Comment File</b> ของแต่ละอัน · เป็นสำเนา ไฟล์จริงยังอยู่ที่เดิม อ่านแล้วลบทิ้งได้ตลอด</div>
         <button id="edl-csv">บันทึกรายงาน CSV</button>
       </div>
@@ -1147,9 +1195,19 @@
     const wantFile = el('edl-getfile').checked;
     const wantStamp = el('edl-getstamp').checked;
     const copyNew = el('edl-copynew').checked;
-    // ทะเบียนสำเนาเดิมใน _Updated — พอมีตัวใหม่เข้ามา ตัวเก่าของเอกสารเดียวกันถูกลบทิ้ง
-    const upIndex = (copyNew && !!rootDir) ? await indexUpdated() : new Map();
+    // ล้างสำเนาที่ค้างเกินกำหนดก่อน แล้วค่อยทำทะเบียนของที่เหลือ
     let upDel = 0;
+    if (copyNew && rootDir) {
+      const days = keepDays();
+      if (days > 0) {
+        const gone = await pruneUpdated(days, dry);
+        if (gone) {
+          upDel += gone;
+          log(`· ${CFG.updatedDir}: ${dry ? 'จะลบ' : 'ลบ'}สำเนาที่เกิน ${days} วัน ${gone} ไฟล์`, 'wn');
+        }
+      }
+    }
+    const upIndex = (copyNew && !!rootDir) ? await indexUpdated() : new Map();
     const wantRCode = el('edl-rcode').checked;
     const revCache = new Map();   // fileid -> ประวัติ Rev เผื่อเอกสารเดิมโผล่ซ้ำ
     const useFS = !!rootDir;
@@ -1469,6 +1527,17 @@
     const c = el(id); if (c) c.addEventListener('change', showAutoKinds);
   });
   showAutoKinds();
+
+  // จำนวนวันที่เก็บสำเนาไว้ใน _Updated
+  const KEEP_KEY = 'edms_keepdays_v1';
+  (() => {
+    const c = el('edl-keepdays');
+    if (!c) return;
+    const v = parseInt(getLS(KEEP_KEY, ''), 10);
+    if (v >= 0) c.value = String(v);
+    else c.value = String(CFG.updatedKeepDays);
+    c.addEventListener('change', () => setLS(KEEP_KEY, String(keepDays())));
+  })();
 
   el('edl-auto').checked = getLS(AUTO_KEY, '') === '1';
   el('edl-auto').onchange = () => { setLS(AUTO_KEY, el('edl-auto').checked ? '1' : '0'); showAutoInfo(); };

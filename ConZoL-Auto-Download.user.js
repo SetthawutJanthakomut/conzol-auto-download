@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GULF ConZoL - Auto Download + Rename + Sort
 // @namespace    gmtp.conzol
-// @version      7.2
+// @version      7.3
 // @description  Download PDFs and native attachments from GULF ConZoL EDMS automatically - names each file and sorts it into the folder ConZoL assigns.
 // @match        https://edms.gulf.co.th/dms/drawing.asp*
 // @match        http://edms.gulf.co.th/dms/drawing.asp*
@@ -22,7 +22,7 @@
   // If a panel already exists the later copy stops here - otherwise ids collide and buttons stop responding
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '7.2';   // kept in sync with @version at build time
+  const VERSION = '7.3';   // kept in sync with @version at build time
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.user.js';   // filled in per language at build time
 
   // ---------------- Settings ----------------
@@ -40,6 +40,7 @@
     updatedDir: '_Updated',       // copies of whatever was just downloaded, all in one folder at the top
     newDir: 'New',                // documents with no file in the folder yet
     revisedDir: 'Revised',        // documents already on disk that ConZoL has re-issued
+    updatedKeepDays: 7,           // a copy in _Updated older than this many days counts as read and is deleted; 0 = keep regardless of age
     // Folders never touched - not scanned, not re-sorted (cancelled MDR documents live here)
     // _Updated holds copies, not the real files - never scan or re-sort it, or they count as already downloaded
     ignoreDirs: ['_Deleted', '_Archive', '_Cancelled', '_Updated']
@@ -158,6 +159,13 @@
   //   New      = no file of this document in the folder at all (just added to ConZoL, or never downloaded)
   //   Revised  = already on disk, but ConZoL issued a newer revision
   // Stamped copies go under Comment File, the same shape as the real document folder, so they never clash with the plain PDF
+  // How many days copies stay in _Updated - read from the box on the Options tab, falling back to the default
+  function keepDays() {
+    const c = el('edl-keepdays');
+    const v = c ? parseInt(c.value, 10) : NaN;
+    return Number.isFinite(v) && v >= 0 ? v : CFG.updatedKeepDays;
+  }
+
   const copyParts = (stamp, isNew) => [CFG.updatedDir, isNew ? CFG.newDir : CFG.revisedDir]
     .concat(stamp ? [CFG.commentDir] : []);
 
@@ -328,6 +336,43 @@
     };
     try { await walk(up, []); } catch (e) {}
     return out;
+  }
+
+  // Delete copies in _Updated past the age limit, judged by the file date itself (the day it was downloaded)
+  // Only inside the copy folder - the real files in the document folders are never touched
+  async function pruneUpdated(days, dry) {
+    if (!rootDir || !(days > 0)) return 0;
+    let up;
+    try { up = await rootDir.getDirectoryHandle(CFG.updatedDir); } catch (e) { return 0; }
+    const cutoff = Date.now() - days * 86400000;
+    const ageOf = (t) => Math.round((Date.now() - t) / 86400000);
+    let gone = 0;
+    // Returns how many entries are left, so an emptied sub-folder can be cleared away too
+    const walk = async (dir) => {
+      const doomed = [], subs = [];
+      let left = 0;
+      for await (const entry of dir.values()) {
+        if (entry.kind === 'directory') { subs.push(entry); continue; }
+        try {
+          const f = await entry.getFile();
+          if (f.lastModified < cutoff) { doomed.push({ name: entry.name, at: f.lastModified }); continue; }
+        } catch (e) {}
+        left++;
+      }
+      for (const d of doomed) {
+        log(`      ↳ ${dry ? 'would delete' : 'deleted'} a copy ${ageOf(d.at)} days old: ${d.name}`, 'sk');
+        if (dry) { gone++; continue; }
+        try { await dir.removeEntry(d.name); gone++; } catch (e) { left++; }
+      }
+      for (const sub of subs) {
+        const rest = await walk(sub);
+        if (rest > 0) left++;
+        else if (!dry) { try { await dir.removeEntry(sub.name); } catch (e) { left++; } }
+      }
+      return left;
+    };
+    try { await walk(up); } catch (e) {}
+    return gone;
   }
 
   async function refreshExisting() {
@@ -853,6 +898,9 @@
         <label><input type="checkbox" id="edl-area" checked> Sub-folder per area code (1400 / 0500 / PCC …)</label>
         <label><input type="checkbox" id="edl-inactive"> Include non-active documents in search</label>
         <label><input type="checkbox" id="edl-copynew" checked> Also copy anything newly downloaded into an <b>_Updated</b> folder</label>
+        <div style="margin-top:3px">Delete copies in <b>_Updated</b> older than
+          <input id="edl-keepdays" type="number" min="0" max="365" step="1" value="7"
+                 style="width:46px;font:11px Consolas,monospace"> days <span class="sk">(0 = keep regardless of age)</span></div>
         <div class="hint">No dated folders. Split into <b>New</b> (no file in the folder yet, or just added to ConZoL) and <b>Revised</b> (a newer revision of a document already on disk), each with its own <b>Comment File</b> for stamped copies. These are copies - the real files stay where they are, so delete them once read.</div>
         <button id="edl-csv">Save CSV report</button>
       </div>
@@ -1161,9 +1209,19 @@
     const wantFile = el('edl-getfile').checked;
     const wantStamp = el('edl-getstamp').checked;
     const copyNew = el('edl-copynew').checked;
-    // Index of the copies already in _Updated - when a newer one arrives, the older copy of that document is deleted
-    const upIndex = (copyNew && !!rootDir) ? await indexUpdated() : new Map();
+    // Clear out copies past the age limit first, then index what is left
     let upDel = 0;
+    if (copyNew && rootDir) {
+      const days = keepDays();
+      if (days > 0) {
+        const gone = await pruneUpdated(days, dry);
+        if (gone) {
+          upDel += gone;
+          log(`. ${CFG.updatedDir}: ${dry ? 'would delete' : 'deleted'} ${gone} copies older than ${days} days`, 'wn');
+        }
+      }
+    }
+    const upIndex = (copyNew && !!rootDir) ? await indexUpdated() : new Map();
     const wantRCode = el('edl-rcode').checked;
     const revCache = new Map();   // fileid -> revision history, in case a document comes round twice
     const useFS = !!rootDir;
@@ -1483,6 +1541,17 @@
     const c = el(id); if (c) c.addEventListener('change', showAutoKinds);
   });
   showAutoKinds();
+
+  // How many days copies stay in _Updated
+  const KEEP_KEY = 'edms_keepdays_v1';
+  (() => {
+    const c = el('edl-keepdays');
+    if (!c) return;
+    const v = parseInt(getLS(KEEP_KEY, ''), 10);
+    if (v >= 0) c.value = String(v);
+    else c.value = String(CFG.updatedKeepDays);
+    c.addEventListener('change', () => setLS(KEEP_KEY, String(keepDays())));
+  })();
 
   el('edl-auto').checked = getLS(AUTO_KEY, '') === '1';
   el('edl-auto').onchange = () => { setLS(AUTO_KEY, el('edl-auto').checked ? '1' : '0'); showAutoInfo(); };

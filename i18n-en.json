@@ -1324,10 +1324,6 @@
   "// Key = document number + kind (plain / stamped): they live in different folders and do not replace each other"
  ],
  [
-  "// ทะเบียนสำเนาเดิมใน _Updated — พอมีตัวใหม่เข้ามา ตัวเก่าของเอกสารเดียวกันถูกลบทิ้ง",
-  "// Index of the copies already in _Updated - when a newer one arrives, the older copy of that document is deleted"
- ],
- [
   "log(`      ↳ สำเนาไป ${copyParts(k.stamp, isNewDoc).join('\\\\')}\\\\${name}`, 'sk');",
   "log(`      ↳ copy to ${copyParts(k.stamp, isNewDoc).join('\\\\')}\\\\${name}`, 'sk');"
  ],
@@ -1350,5 +1346,49 @@
  [
   " · ล้าง _Updated ${s.upDel}",
   " · cleared from _Updated ${s.upDel}"
+ ],
+ [
+  "updatedKeepDays: 7,           // สำเนาใน _Updated เก่ากว่านี้ (วัน) ถือว่าอ่านแล้ว ลบทิ้ง · 0 = ไม่ลบตามอายุ",
+  "updatedKeepDays: 7,           // a copy in _Updated older than this many days counts as read and is deleted; 0 = keep regardless of age"
+ ],
+ [
+  "// จำนวนวันที่เก็บสำเนาไว้ใน _Updated — อ่านจากช่องในแท็บตั้งค่า ถ้าว่างหรือพังใช้ค่า default",
+  "// How many days copies stay in _Updated - read from the box on the Options tab, falling back to the default"
+ ],
+ [
+  "// ลบสำเนาใน _Updated ที่เก่าเกินกำหนด — ดูจากวันที่ของไฟล์เอง (คือวันที่โหลดมา)",
+  "// Delete copies in _Updated past the age limit, judged by the file date itself (the day it was downloaded)"
+ ],
+ [
+  "// ลบเฉพาะในโฟลเดอร์สำเนาเท่านั้น ไฟล์จริงในโฟลเดอร์เอกสารไม่ถูกแตะ",
+  "// Only inside the copy folder - the real files in the document folders are never touched"
+ ],
+ [
+  "// คืนจำนวนที่ยังเหลือในโฟลเดอร์ เพื่อเก็บกวาดโฟลเดอร์ย่อยที่ว่างแล้วออกด้วย",
+  "// Returns how many entries are left, so an emptied sub-folder can be cleared away too"
+ ],
+ [
+  "log(`      ↳ ${dry ? 'จะลบ' : 'ลบ'}สำเนาอายุ ${ageOf(d.at)} วัน: ${d.name}`, 'sk');",
+  "log(`      ↳ ${dry ? 'would delete' : 'deleted'} a copy ${ageOf(d.at)} days old: ${d.name}`, 'sk');"
+ ],
+ [
+  "<div style=\"margin-top:3px\">ลบสำเนาใน <b>_Updated</b> ที่เก่าเกิน",
+  "<div style=\"margin-top:3px\">Delete copies in <b>_Updated</b> older than"
+ ],
+ [
+  "style=\"width:46px;font:11px Consolas,monospace\"> วัน <span class=\"sk\">(0 = ไม่ลบตามอายุ)</span></div>",
+  "style=\"width:46px;font:11px Consolas,monospace\"> days <span class=\"sk\">(0 = keep regardless of age)</span></div>"
+ ],
+ [
+  "// ล้างสำเนาที่ค้างเกินกำหนดก่อน แล้วค่อยทำทะเบียนของที่เหลือ",
+  "// Clear out copies past the age limit first, then index what is left"
+ ],
+ [
+  "log(`· ${CFG.updatedDir}: ${dry ? 'จะลบ' : 'ลบ'}สำเนาที่เกิน ${days} วัน ${gone} ไฟล์`, 'wn');",
+  "log(`. ${CFG.updatedDir}: ${dry ? 'would delete' : 'deleted'} ${gone} copies older than ${days} days`, 'wn');"
+ ],
+ [
+  "// จำนวนวันที่เก็บสำเนาไว้ใน _Updated",
+  "// How many days copies stay in _Updated"
  ]
 ]
