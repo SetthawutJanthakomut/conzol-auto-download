@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GULF ConZoL – Auto Download + Rename + Sort (MDR)
 // @namespace    gmtp.marine.jay
-// @version      7.3
+// @version      7.4
 // @description  ดาวน์โหลด PDF และไฟล์แนบ (FILE+) จาก ConZoL ลงโฟลเดอร์ที่เลือกไว้โดยตรง (ไม่ผ่าน Download ของ Chrome) ตั้งชื่อ <DocNo>-<Rev>_<Title>.pdf แยกโฟลเดอร์ตามหมวด ย้าย Rev เก่าเข้า _Superseded และอ่านรายการจากไฟล์ MDR ให้เอง
 // @author       JAY
 // @match        https://edms.gulf.co.th/dms/drawing.asp*
@@ -22,7 +22,7 @@
   // ถ้ามีกล่องอยู่แล้ว ให้ชุดที่มาทีหลังหยุดทำงาน ไม่งั้น id จะซ้ำและปุ่มจะกดไม่ติด
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '7.3';   // ซิงก์อัตโนมัติจาก @version ตอน build
+  const VERSION = '7.4';   // ซิงก์อัตโนมัติจาก @version ตอน build
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.th.user.js';   // build.py ใส่ให้ตามภาษา
 
   // ---------------- ตั้งค่าได้ตรงนี้ ----------------
@@ -1194,6 +1194,7 @@
     const copyNew = el('edl-copynew').checked;
     // ล้างสำเนาที่ค้างเกินกำหนดก่อน แล้วค่อยทำทะเบียนของที่เหลือ
     let upDel = 0;
+    const got = [];   // รายการที่โหลดได้รอบนี้ ไว้เขียนสรุปท้าย log
     if (copyNew && rootDir) {
       const days = keepDays();
       if (days > 0) {
@@ -1224,6 +1225,9 @@
       const have = existing.get(doc);
       // ดูก่อนเริ่มโหลด: ยังไม่มีไฟล์ของเอกสารนี้เลย = ของใหม่ (have จะโตขึ้นระหว่างรอบ)
       const isNewDoc = have.length === 0;
+      // Rev ที่สูงสุดในโฟลเดอร์ก่อนรอบนี้ — เอาไว้เขียนสรุปว่า T2 → T3
+      const prevRev = have.length
+        ? have.slice().sort((a, b) => b.rank - a.rank)[0].rev : '';
       const parts = targetPath(doc, r.groupCode, r.groupName);
 
       // R.Code กับไฟล์ตราประทับอยู่ในตารางประวัติ ไม่ได้อยู่ในหน้าผลค้นหา ต้องไปดึงมาต่างหาก
@@ -1303,6 +1307,7 @@
           }
           sup += willSup.length;
           lastReport.push({ ...kr, result: 'จะโหลด', file: name, folder: kParts.join('\\') });
+          got.push({ doc, rev: String(kr.rev || ''), title: kr.title || '', kind, isNew: isNewDoc, prev: prevRev });
           log(`[${i}/${items.length}] + ${name}  →  ${kParts.join('\\')}`, 'ok');
           if (copyNew && useFS) {
             log(`      ↳ สำเนาไป ${copyParts(k.stamp, isNewDoc).join('\\')}\\${name}`, 'sk');
@@ -1365,6 +1370,7 @@
             }
             ok++; done = true;
             lastReport.push({ ...kr, result: 'สำเร็จ', file: name, folder: kParts.join('\\') });
+            got.push({ doc, rev: String(kr.rev || ''), title: kr.title || '', kind, isNew: isNewDoc, prev: prevRev });
             log(`[${i}/${items.length}] ✓ ${name} (${(blob.size / 1048576).toFixed(2)} MB)`, 'ok');
           } catch (e) {
             if (a === CFG.retry) {
@@ -1377,7 +1383,42 @@
         await sleep(CFG.delayMs);
       }
     }
+    summarize(got, dry);
     return { ok, skipped, fail, sup, upDel };
+  }
+
+  // สรุปท้าย log — บอกเป็นรายการว่ารอบนี้ได้เอกสารใหม่อะไร และตัวไหน Rev ขยับจากอะไรเป็นอะไร
+  function summarize(got, dry) {
+    const cut = (t) => { t = String(t || '').trim(); return t.length > 58 ? t.slice(0, 57) + '…' : t; };
+    const one = new Map();      // เอกสารละบรรทัด ไฟล์ปกติเป็นตัวหลัก
+    const stamped = new Map();
+    for (const g of got) {
+      const m = g.kind === 'stamp' ? stamped : one;
+      if (!m.has(g.doc)) m.set(g.doc, g);
+    }
+    const fresh = [...one.values()].filter((g) => g.isNew);
+    const rev = [...one.values()].filter((g) => !g.isNew);
+    const st = [...stamped.values()];
+    if (!fresh.length && !rev.length && !st.length) {
+      log(dry ? '— สรุป: ไม่มีเอกสารใหม่หรือ Rev ใหม่ให้โหลด —' : '— สรุป: ไม่มีเอกสารใหม่หรือ Rev ใหม่ในรอบนี้ —', 'wn');
+      return;
+    }
+    log(dry ? '— สรุป (ยังไม่ได้โหลด) —' : '— สรุปรอบนี้ —', 'wn');
+    if (fresh.length) {
+      log(`เอกสารใหม่ ${fresh.length} ฉบับ  →  ${CFG.updatedDir}\\${CFG.newDir}`, 'ok');
+      fresh.sort((a, b) => a.doc.localeCompare(b.doc))
+        .forEach((g) => log(`   • ${g.doc}  ${g.rev}  ${cut(g.title)}`, 'ok'));
+    }
+    if (rev.length) {
+      log(`Rev ใหม่ ${rev.length} ฉบับ  →  ${CFG.updatedDir}\\${CFG.revisedDir}`, 'ok');
+      rev.sort((a, b) => a.doc.localeCompare(b.doc))
+        .forEach((g) => log(`   • ${g.doc}  ${g.prev ? g.prev + ' → ' : ''}${g.rev}  ${cut(g.title)}`, 'ok'));
+    }
+    if (st.length) {
+      log(`ไฟล์ตราประทับ ${st.length} ฉบับ  →  ${CFG.commentDir}`, 'sk');
+      st.sort((a, b) => a.doc.localeCompare(b.doc))
+        .forEach((g) => log(`   • ${g.doc}  ${g.rev}`, 'sk'));
+    }
   }
 
   async function preflight() {

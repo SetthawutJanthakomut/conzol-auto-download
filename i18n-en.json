@@ -1390,5 +1390,41 @@
  [
   "// จำนวนวันที่เก็บสำเนาไว้ใน _Updated",
   "// How many days copies stay in _Updated"
+ ],
+ [
+  "const got = [];   // รายการที่โหลดได้รอบนี้ ไว้เขียนสรุปท้าย log",
+  "const got = [];   // what this run brought in, for the summary at the end of the log"
+ ],
+ [
+  "// Rev ที่สูงสุดในโฟลเดอร์ก่อนรอบนี้ — เอาไว้เขียนสรุปว่า T2 → T3",
+  "// Highest revision on disk before this run - so the summary can say T2 -> T3"
+ ],
+ [
+  "// สรุปท้าย log — บอกเป็นรายการว่ารอบนี้ได้เอกสารใหม่อะไร และตัวไหน Rev ขยับจากอะไรเป็นอะไร",
+  "// Summary at the end of the log - which documents are new, and which moved from one revision to another"
+ ],
+ [
+  "const one = new Map();      // เอกสารละบรรทัด ไฟล์ปกติเป็นตัวหลัก",
+  "const one = new Map();      // one line per document, the plain file being the headline"
+ ],
+ [
+  "log(dry ? '— สรุป: ไม่มีเอกสารใหม่หรือ Rev ใหม่ให้โหลด —' : '— สรุป: ไม่มีเอกสารใหม่หรือ Rev ใหม่ในรอบนี้ —', 'wn');",
+  "log(dry ? '- Summary: nothing new and no new revision to download -' : '- Summary: nothing new and no new revision this run -', 'wn');"
+ ],
+ [
+  "log(dry ? '— สรุป (ยังไม่ได้โหลด) —' : '— สรุปรอบนี้ —', 'wn');",
+  "log(dry ? '- Summary (nothing downloaded yet) -' : '- Summary of this run -', 'wn');"
+ ],
+ [
+  "log(`เอกสารใหม่ ${fresh.length} ฉบับ  →  ${CFG.updatedDir}\\\\${CFG.newDir}`, 'ok');",
+  "log(`New documents: ${fresh.length}  ->  ${CFG.updatedDir}\\\\${CFG.newDir}`, 'ok');"
+ ],
+ [
+  "log(`Rev ใหม่ ${rev.length} ฉบับ  →  ${CFG.updatedDir}\\\\${CFG.revisedDir}`, 'ok');",
+  "log(`New revisions: ${rev.length}  ->  ${CFG.updatedDir}\\\\${CFG.revisedDir}`, 'ok');"
+ ],
+ [
+  "log(`ไฟล์ตราประทับ ${st.length} ฉบับ  →  ${CFG.commentDir}`, 'sk');",
+  "log(`Stamped copies: ${st.length}  ->  ${CFG.commentDir}`, 'sk');"
  ]
 ]

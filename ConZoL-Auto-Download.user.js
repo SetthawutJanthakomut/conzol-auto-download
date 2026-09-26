@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GULF ConZoL - Auto Download + Rename + Sort
 // @namespace    gmtp.conzol
-// @version      7.3
+// @version      7.4
 // @description  Download PDFs and native attachments from GULF ConZoL EDMS automatically - names each file and sorts it into the folder ConZoL assigns.
 // @match        https://edms.gulf.co.th/dms/drawing.asp*
 // @match        http://edms.gulf.co.th/dms/drawing.asp*
@@ -22,7 +22,7 @@
   // If a panel already exists the later copy stops here - otherwise ids collide and buttons stop responding
   if (document.getElementById('edmsdl')) return;
 
-  const VERSION = '7.3';   // kept in sync with @version at build time
+  const VERSION = '7.4';   // kept in sync with @version at build time
   const UPDATE_URL = 'https://raw.githubusercontent.com/SetthawutJanthakomut/conzol-auto-download/main/ConZoL-Auto-Download.user.js';   // filled in per language at build time
 
   // ---------------- Settings ----------------
@@ -1211,6 +1211,7 @@
     const copyNew = el('edl-copynew').checked;
     // Clear out copies past the age limit first, then index what is left
     let upDel = 0;
+    const got = [];   // what this run brought in, for the summary at the end of the log
     if (copyNew && rootDir) {
       const days = keepDays();
       if (days > 0) {
@@ -1241,6 +1242,9 @@
       const have = existing.get(doc);
       // Checked before downloading: no file of this document yet = new (have grows during the run)
       const isNewDoc = have.length === 0;
+      // Highest revision on disk before this run - so the summary can say T2 -> T3
+      const prevRev = have.length
+        ? have.slice().sort((a, b) => b.rank - a.rank)[0].rev : '';
       const parts = targetPath(doc, r.groupCode, r.groupName);
 
       // R.Code and the stamped copy live in the history table, not in the search results - fetch them separately
@@ -1320,6 +1324,7 @@
           }
           sup += willSup.length;
           lastReport.push({ ...kr, result: 'Will download', file: name, folder: kParts.join('\\') });
+          got.push({ doc, rev: String(kr.rev || ''), title: kr.title || '', kind, isNew: isNewDoc, prev: prevRev });
           log(`[${i}/${items.length}] + ${name}  →  ${kParts.join('\\')}`, 'ok');
           if (copyNew && useFS) {
             log(`      ↳ copy to ${copyParts(k.stamp, isNewDoc).join('\\')}\\${name}`, 'sk');
@@ -1382,6 +1387,7 @@
             }
             ok++; done = true;
             lastReport.push({ ...kr, result: 'Downloaded', file: name, folder: kParts.join('\\') });
+            got.push({ doc, rev: String(kr.rev || ''), title: kr.title || '', kind, isNew: isNewDoc, prev: prevRev });
             log(`[${i}/${items.length}] ✓ ${name} (${(blob.size / 1048576).toFixed(2)} MB)`, 'ok');
           } catch (e) {
             if (a === CFG.retry) {
@@ -1394,7 +1400,42 @@
         await sleep(CFG.delayMs);
       }
     }
+    summarize(got, dry);
     return { ok, skipped, fail, sup, upDel };
+  }
+
+  // Summary at the end of the log - which documents are new, and which moved from one revision to another
+  function summarize(got, dry) {
+    const cut = (t) => { t = String(t || '').trim(); return t.length > 58 ? t.slice(0, 57) + '…' : t; };
+    const one = new Map();      // one line per document, the plain file being the headline
+    const stamped = new Map();
+    for (const g of got) {
+      const m = g.kind === 'stamp' ? stamped : one;
+      if (!m.has(g.doc)) m.set(g.doc, g);
+    }
+    const fresh = [...one.values()].filter((g) => g.isNew);
+    const rev = [...one.values()].filter((g) => !g.isNew);
+    const st = [...stamped.values()];
+    if (!fresh.length && !rev.length && !st.length) {
+      log(dry ? '- Summary: nothing new and no new revision to download -' : '- Summary: nothing new and no new revision this run -', 'wn');
+      return;
+    }
+    log(dry ? '- Summary (nothing downloaded yet) -' : '- Summary of this run -', 'wn');
+    if (fresh.length) {
+      log(`New documents: ${fresh.length}  ->  ${CFG.updatedDir}\\${CFG.newDir}`, 'ok');
+      fresh.sort((a, b) => a.doc.localeCompare(b.doc))
+        .forEach((g) => log(`   • ${g.doc}  ${g.rev}  ${cut(g.title)}`, 'ok'));
+    }
+    if (rev.length) {
+      log(`New revisions: ${rev.length}  ->  ${CFG.updatedDir}\\${CFG.revisedDir}`, 'ok');
+      rev.sort((a, b) => a.doc.localeCompare(b.doc))
+        .forEach((g) => log(`   • ${g.doc}  ${g.prev ? g.prev + ' → ' : ''}${g.rev}  ${cut(g.title)}`, 'ok'));
+    }
+    if (st.length) {
+      log(`Stamped copies: ${st.length}  ->  ${CFG.commentDir}`, 'sk');
+      st.sort((a, b) => a.doc.localeCompare(b.doc))
+        .forEach((g) => log(`   • ${g.doc}  ${g.rev}`, 'sk'));
+    }
   }
 
   async function preflight() {
